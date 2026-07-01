@@ -48,6 +48,7 @@ export default function LoginPage() {
         setError("Correo o contraseña incorrectos.");
         setLoading(false);
       } else {
+        setLoading(false);
         router.push("/");
         router.refresh();
       }
@@ -63,10 +64,13 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
         setLoading(false);
-      } else if (data.user && !data.session) {
-        setSuccess("¡Revisa tu correo para confirmar tu cuenta!");
+      } else if (!data.session) {
+        // Email confirmation required OR email already exists (Supabase returns no error for duplicate)
+        setSuccess("¡Cuenta creada! Revisa tu correo para confirmar y luego inicia sesión.");
         setLoading(false);
       } else {
+        // Session available immediately (email confirmation disabled in Supabase)
+        setLoading(false);
         router.push("/");
         router.refresh();
       }
