@@ -2,8 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, Calendar, Clock, Scissors, DollarSign, ShoppingBag, Users } from "lucide-react";
+import { Calendar, Clock, Scissors, DollarSign, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
+import { BackButton } from "@/components/ui/back-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CancelButton } from "@/components/booking/cancel-button";
 import { RescheduleClient } from "@/components/booking/reschedule-client";
@@ -63,12 +64,7 @@ export default async function CitaDetailPage({
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-6 space-y-5">
       <RealtimeRefresher tables={["appointments"]} />
       <header className="flex items-center gap-3">
-        <Link
-          href="/citas"
-          className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center"
-        >
-          <ChevronLeft size={20} />
-        </Link>
+        <BackButton />
         <h1 className="text-xl font-bold text-foreground">Detalle de cita</h1>
       </header>
 

@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import { GuestAdder } from "@/components/booking/guest-adder";
 
 export default async function InvitadoPage() {
@@ -45,12 +46,7 @@ export default async function InvitadoPage() {
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
       <header className="flex items-center gap-3">
-        <Link
-          href="/"
-          className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center"
-        >
-          <ChevronLeft size={20} />
-        </Link>
+        <BackButton />
         <div>
           <h1 className="text-xl font-bold text-foreground">Agregar invitado</h1>
           <p className="text-sm text-muted">Trae a un amigo a tu cita</p>

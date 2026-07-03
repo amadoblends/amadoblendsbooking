@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ShoppingBag, Package } from "lucide-react";
 import Image from "next/image";
 import { BackButton } from "@/components/ui/back-button";
+import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function TiendaPage() {
   const supabase = await createClient();
@@ -20,6 +21,7 @@ export default async function TiendaPage() {
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
+      <RealtimeRefresher tables={["products"]} />
       <header className="flex items-center gap-3">
         <BackButton />
         <div>

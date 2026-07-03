@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BookingFlow } from "@/components/booking/booking-flow";
 import { BackButton } from "@/components/ui/back-button";
+import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function ReservarPage({
   searchParams,
@@ -53,8 +54,30 @@ export default async function ReservarPage({
       .eq("is_active", true),
   ]);
 
+  // Names of the single services included in each combo (hidden singles too)
+  const [{ data: packageItems }, { data: allServiceNames }] = await Promise.all([
+    supabase.from("service_package_items").select("package_id, item_service_id"),
+    supabase.from("services").select("id, name"),
+  ]);
+
+  const nameById = new Map((allServiceNames ?? []).map((s) => [s.id, s.name]));
+  const includesByPackage = new Map<string, string[]>();
+  for (const row of packageItems ?? []) {
+    const itemName = nameById.get(row.item_service_id);
+    if (!itemName) continue;
+    const list = includesByPackage.get(row.package_id) ?? [];
+    list.push(itemName);
+    includesByPackage.set(row.package_id, list);
+  }
+
+  const servicesWithIncludes = (services ?? []).map((s) => ({
+    ...s,
+    included_names: s.kind === "package" ? (includesByPackage.get(s.id) ?? []) : [],
+  }));
+
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4">
+      <RealtimeRefresher tables={["services", "promotions", "products"]} />
       <header className="mb-5 flex items-center gap-3">
         <BackButton />
         <div>
@@ -65,7 +88,7 @@ export default async function ReservarPage({
 
       <BookingFlow
         clientId={client.id}
-        services={services ?? []}
+        services={servicesWithIncludes}
         products={products ?? []}
         availability={availability ?? []}
         promotions={promotions ?? []}

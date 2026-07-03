@@ -7,6 +7,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { QuickAccessGrid } from "@/components/home/quick-access-grid";
+import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -47,6 +48,7 @@ export default async function HomePage() {
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-6">
+      <RealtimeRefresher tables={["services", "appointments"]} />
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">

@@ -28,6 +28,7 @@ interface Service {
   image_url: string | null;
   kind: "single" | "package";
   description?: string | null;
+  included_names?: string[];
 }
 
 interface Promotion {
@@ -524,7 +525,7 @@ export function BookingFlow({
         <div className="flex rounded-xl bg-surface border border-border p-1">
           {([
             { key: "single", label: "Servicios" },
-            { key: "package", label: "Paquetes" },
+            { key: "package", label: "Combos" },
           ] as { key: Tab; label: string }[]).map((t) => (
             <button
               key={t.key}
@@ -545,54 +546,83 @@ export function BookingFlow({
           </p>
         ) : (
           <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
-            {shown.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  setService(s);
-                  setTime("");
-                  setDayChosen(false);
-                  setStep("products");
-                }}
-                className="w-full flex items-start gap-3 bg-surface rounded-2xl border border-border p-3.5 active:bg-background text-left"
-              >
-                {s.image_url ? (
-                  <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0">
-                    <Image
-                      src={s.image_url}
-                      alt={s.name}
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center"
-                    style={{ background: `${s.color}26` }}
-                  >
-                    {s.kind === "package" ? (
-                      <Sparkles size={22} style={{ color: s.color }} />
-                    ) : (
-                      <Scissors size={22} style={{ color: s.color }} />
-                    )}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground">{s.name}</p>
-                  {s.description && (
-                    <p className="text-xs text-muted line-clamp-2 mt-0.5">{s.description}</p>
+            {shown.map((s) => {
+              const isCombo = s.kind === "package";
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setService(s);
+                    setTime("");
+                    setDayChosen(false);
+                    setStep("products");
+                  }}
+                  className={cn(
+                    "w-full flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+                    isCombo
+                      ? "bg-gradient-to-br from-surface to-brand-light border-brand/40 active:border-brand"
+                      : "bg-surface border-border active:bg-background"
                   )}
-                  <p className="text-xs text-muted mt-0.5">⏱ {s.duration_minutes} min</p>
-                </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  <p className="text-base font-bold text-brand">${s.price}</p>
-                  <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
-                    <span className="text-white font-bold text-base leading-none">+</span>
+                >
+                  {s.image_url ? (
+                    <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0">
+                      <Image
+                        src={s.image_url}
+                        alt={s.name}
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className={cn(
+                        "w-16 h-16 rounded-xl shrink-0 flex items-center justify-center",
+                        isCombo && "bg-brand/15"
+                      )}
+                      style={isCombo ? undefined : { background: `${s.color}26` }}
+                    >
+                      {isCombo ? (
+                        <Sparkles size={22} className="text-brand" />
+                      ) : (
+                        <Scissors size={22} style={{ color: s.color }} />
+                      )}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-semibold text-sm text-foreground">{s.name}</p>
+                      {isCombo && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black tracking-wide text-white bg-brand px-1.5 py-0.5 rounded-full uppercase">
+                          <Sparkles size={8} /> Combo
+                        </span>
+                      )}
+                    </div>
+                    {isCombo && s.included_names && s.included_names.length > 0 ? (
+                      <div className="mt-1 space-y-0.5">
+                        {s.included_names.map((n, i) => (
+                          <p key={i} className="text-xs text-muted flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-brand inline-block shrink-0" />
+                            {n}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      s.description && (
+                        <p className="text-xs text-muted line-clamp-2 mt-0.5">{s.description}</p>
+                      )
+                    )}
+                    <p className="text-xs text-muted mt-0.5">⏱ {s.duration_minutes} min</p>
                   </div>
-                </div>
-              </button>
-            ))}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <p className="text-base font-bold text-brand">${s.price}</p>
+                    <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
+                      <span className="text-white font-bold text-base leading-none">+</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
