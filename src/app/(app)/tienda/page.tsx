@@ -30,7 +30,7 @@ export default async function TiendaPage() {
           <p className="text-sm text-muted">Pronto tendremos productos disponibles.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {products.map((p) => (
             <div
               key={p.id}

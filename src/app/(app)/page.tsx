@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Bell, CalendarPlus, Clock, Scissors, ShoppingBag, User } from "lucide-react";
+import { Bell, CalendarPlus, Clock, Scissors, ShoppingBag, UserPlus } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -9,8 +9,8 @@ import { redirect } from "next/navigation";
 const quickAccess = [
   { href: "/reservar", label: "Reservar cita", icon: CalendarPlus },
   { href: "/citas", label: "Mis citas", icon: Clock },
+  { href: "/invitado", label: "Agregar invitado", icon: UserPlus },
   { href: "/tienda", label: "Productos", icon: ShoppingBag },
-  { href: "/perfil", label: "Mi perfil", icon: User },
 ];
 
 export default async function HomePage() {
@@ -154,7 +154,7 @@ export default async function HomePage() {
               Ver todos
             </Link>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
             {services.map((s) => (
               <Link
                 key={s.id}

@@ -10,11 +10,12 @@ import {
 import { es } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Check, Loader2, Scissors, Sparkles,
-  CalendarDays, Timer, ShoppingBag, Minus, Plus,
+  CalendarDays, Timer, ShoppingBag, Minus, Plus, UserPlus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { GuestForm } from "./guest-form";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -100,7 +101,7 @@ function generateSlots(
   return out;
 }
 
-type Step = "service" | "datetime" | "confirm" | "success";
+type Step = "service" | "products" | "datetime" | "confirm" | "success";
 type Tab = "single" | "package";
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -128,26 +129,25 @@ export function BookingFlow({
     ? (services.find((s) => s.id === preselectedServiceId) ?? null)
     : null;
 
-  const [step, setStep] = useState<Step>(initService ? "datetime" : "service");
+  const [step, setStep] = useState<Step>(initService ? "products" : "service");
   const [tab, setTab] = useState<Tab>("single");
   const [service, setService] = useState<Service | null>(initService);
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [dayChosen, setDayChosen] = useState(false); // collapses the calendar
+  const [dayChosen, setDayChosen] = useState(false);
   const [time, setTime] = useState("");
   const [calCursor, setCalCursor] = useState(startOfMonth(new Date()));
   const [monthBusy, setMonthBusy] = useState<BusyInterval[]>([]);
   const [busyLoading, setBusyLoading] = useState(false);
-  const [busyVersion, setBusyVersion] = useState(0); // bump to refetch
+  const [busyVersion, setBusyVersion] = useState(0);
   const [holdExpiresAt, setHoldExpiresAt] = useState<number | null>(null);
   const [holdSecondsLeft, setHoldSecondsLeft] = useState(HOLD_SECONDS);
   const [holdError, setHoldError] = useState<string | null>(null);
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Products add-on state (success step)
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [productsSaved, setProductsSaved] = useState(false);
-  const [savingProducts, setSavingProducts] = useState(false);
+  // Success step: guest flow
+  const [guestPrompt, setGuestPrompt] = useState<"ask" | "form" | "done" | "skipped">("ask");
 
   const holdActive = holdExpiresAt !== null;
 
@@ -159,6 +159,13 @@ export function BookingFlow({
   const packages = services.filter((s) => s.kind === "package");
   const shown = tab === "single" ? singles : packages;
 
+  const cartItems = Object.entries(cart).filter(([, q]) => q > 0);
+  const cartCount = cartItems.reduce((a, [, q]) => a + q, 0);
+  const cartTotal = cartItems.reduce((a, [id, q]) => {
+    const p = products.find((pp) => pp.id === id);
+    return a + (p ? Number(p.price) * q : 0);
+  }, 0);
+
   const getDayAvail = useCallback(
     (dateStr: string) => {
       const wd = new Date(dateStr + "T00:00:00").getDay();
@@ -169,7 +176,7 @@ export function BookingFlow({
 
   const dayAvail = useMemo(() => getDayAvail(date), [date, getDayAvail]);
 
-  // ── Busy times for the whole visible month (capacity + slots) ─────────────
+  // ── Busy times for the visible month ───────────────────────────────────────
   useEffect(() => {
     if (step !== "datetime" && step !== "confirm") return;
     let alive = true;
@@ -202,7 +209,6 @@ export function BookingFlow({
     return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, monthBusy);
   }, [dayAvail, service, date, minNoticeMinutes, monthBusy]);
 
-  // Remaining capacity per visible day (shown under the day number)
   const dayCapacity = useCallback(
     (d: Date): number | null => {
       if (!service) return null;
@@ -226,7 +232,6 @@ export function BookingFlow({
     createBrowser().rpc("release_my_holds").then(() => {});
   }, []);
 
-  // Release on unmount / page close
   const releaseRef = useRef(releaseHolds);
   releaseRef.current = releaseHolds;
   useEffect(() => {
@@ -238,7 +243,6 @@ export function BookingFlow({
     };
   }, []);
 
-  // Countdown tick
   useEffect(() => {
     if (holdExpiresAt === null) return;
     const tick = () => {
@@ -320,33 +324,37 @@ export function BookingFlow({
       return;
     }
 
+    // Attach requested products
+    if (cartItems.length > 0) {
+      await supabase.from("appointment_products").insert(
+        cartItems.map(([productId, quantity]) => ({
+          appointment_id: inserted.id,
+          product_id: productId,
+          quantity,
+        }))
+      );
+    }
+
     setAppointmentId(inserted.id);
     releaseHolds();
+    setGuestPrompt("ask");
     setStep("success");
     setLoading(false);
   }
 
-  async function saveProducts() {
-    if (!appointmentId) return;
-    const rows = Object.entries(cart)
-      .filter(([, q]) => q > 0)
-      .map(([productId, quantity]) => ({
-        appointment_id: appointmentId,
-        product_id: productId,
-        quantity,
-      }));
-    if (rows.length === 0) return;
-    setSavingProducts(true);
-    const supabase = createBrowser();
-    await supabase.from("appointment_products").insert(rows);
-    setSavingProducts(false);
-    setProductsSaved(true);
+  function resetAll() {
+    setStep("service");
+    setService(null);
+    setTime("");
+    setDayChosen(false);
+    setAppointmentId(null);
+    setCart({});
+    setGuestPrompt("ask");
   }
 
   // ── Render: success ────────────────────────────────────────────────────────
 
   if (step === "success") {
-    const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
     return (
       <div className="space-y-6 py-4">
         <div className="flex flex-col items-center text-center space-y-4">
@@ -360,22 +368,192 @@ export function BookingFlow({
               {fmtSlot(time)}
             </p>
             <p className="text-sm text-muted">{service?.name}</p>
+            {cartCount > 0 && (
+              <p className="text-xs text-success mt-1">
+                ✓ {cartCount} producto{cartCount > 1 ? "s" : ""} para tu visita
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Products add-on */}
-        {products.length > 0 && !productsSaved && (
-          <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <ShoppingBag size={17} className="text-brand" />
-              <p className="font-semibold text-sm text-foreground">
-                ¿Quieres agregar productos a tu visita?
-              </p>
+        {/* Guest prompt — first thing after booking */}
+        {guestPrompt === "ask" && appointmentId && (
+          <div className="bg-surface rounded-2xl border border-border p-4 space-y-3 text-center">
+            <div className="w-11 h-11 rounded-full bg-brand-light flex items-center justify-center mx-auto">
+              <UserPlus size={20} className="text-brand" />
             </div>
-            <p className="text-xs text-muted">
-              Los preparamos para que los recojas y pagues en tu cita.
+            <p className="font-semibold text-sm text-foreground">
+              ¿Deseas agregar un amigo o invitado a esta cita?
             </p>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setGuestPrompt("skipped")}
+                className="flex-1 h-10 rounded-xl border border-border text-sm font-semibold text-muted"
+              >
+                No, gracias
+              </button>
+              <button
+                onClick={() => setGuestPrompt("form")}
+                className="flex-1 h-10 rounded-xl bg-brand text-white text-sm font-semibold"
+              >
+                Sí, agregar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {guestPrompt === "form" && appointmentId && (
+          <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
+            <p className="font-semibold text-sm text-foreground">Datos del invitado</p>
+            <GuestForm appointmentId={appointmentId} onDone={() => setGuestPrompt("done")} />
+          </div>
+        )}
+
+        {guestPrompt === "done" && (
+          <div className="bg-success-light rounded-xl p-3 border border-success/20 text-center">
+            <p className="text-xs text-success font-semibold">
+              ✓ Invitado agregado. Te esperamos a los dos.
+            </p>
+          </div>
+        )}
+
+        {(guestPrompt === "done" || guestPrompt === "skipped") && (
+          <div className="flex gap-3">
+            <button
+              onClick={resetAll}
+              className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-foreground"
+            >
+              Otra cita
+            </button>
+            <button
+              onClick={() => router.push("/citas")}
+              className="flex-1 h-11 rounded-xl bg-brand text-white text-sm font-semibold"
+            >
+              Mis reservas
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Render: service selection ──────────────────────────────────────────────
+
+  if (step === "service") {
+    return (
+      <div className="space-y-4">
+        <div className="flex rounded-xl bg-surface border border-border p-1">
+          {([
+            { key: "single", label: "Servicios" },
+            { key: "package", label: "Paquetes" },
+          ] as { key: Tab; label: string }[]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                "flex-1 h-9 rounded-lg text-sm font-semibold transition-colors",
+                tab === t.key ? "bg-brand text-white" : "text-muted"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {shown.length === 0 ? (
+          <p className="text-sm text-muted text-center py-8">
+            {tab === "package" ? "Aún no hay paquetes disponibles." : "Aún no hay servicios."}
+          </p>
+        ) : (
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
+            {shown.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => {
+                  setService(s);
+                  setTime("");
+                  setDayChosen(false);
+                  setStep("products");
+                }}
+                className="w-full flex items-center gap-3 bg-surface rounded-2xl border border-border p-3.5 active:bg-background text-left"
+              >
+                {s.image_url ? (
+                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                    <Image
+                      src={s.image_url}
+                      alt={s.name}
+                      width={56}
+                      height={56}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center"
+                    style={{ background: `${s.color}26` }}
+                  >
+                    {s.kind === "package" ? (
+                      <Sparkles size={20} style={{ color: s.color }} />
+                    ) : (
+                      <Scissors size={20} style={{ color: s.color }} />
+                    )}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-foreground">{s.name}</p>
+                  <p className="text-xs text-muted">{s.duration_minutes} min</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <p className="text-sm font-bold text-foreground">${s.price}</p>
+                  <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
+                    <span className="text-white font-bold text-base leading-none">+</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Render: products add-on ────────────────────────────────────────────────
+
+  if (step === "products") {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => setStep("service")}
+          className="flex items-center gap-2 text-sm text-muted"
+        >
+          <ChevronLeft size={16} /> Cambiar servicio
+        </button>
+
+        <div className="bg-surface rounded-xl border border-border p-3 flex items-center gap-3">
+          <div className="w-2 h-10 rounded-full shrink-0" style={{ background: service?.color }} />
+          <div>
+            <p className="font-semibold text-sm text-foreground">{service?.name}</p>
+            <p className="text-xs text-muted">
+              {service?.duration_minutes} min · ${service?.price}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShoppingBag size={17} className="text-brand" />
+            <p className="font-semibold text-sm text-foreground">
+              ¿Quieres agregar productos a tu visita?
+            </p>
+          </div>
+          <p className="text-xs text-muted">
+            Los preparamos para que los recojas y pagues en tu cita. Opcional.
+          </p>
+
+          {products.length === 0 ? (
+            <p className="text-xs text-muted text-center py-3">No hay productos disponibles.</p>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto">
               {products.map((p) => {
                 const qty = cart[p.id] ?? 0;
                 return (
@@ -423,129 +601,21 @@ export function BookingFlow({
                 );
               })}
             </div>
-            {cartCount > 0 && (
-              <button
-                onClick={saveProducts}
-                disabled={savingProducts}
-                className="w-full h-11 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {savingProducts && <Loader2 size={15} className="animate-spin" />}
-                Agregar {cartCount} producto{cartCount > 1 ? "s" : ""}
-              </button>
-            )}
-          </div>
-        )}
+          )}
 
-        {productsSaved && (
-          <div className="bg-success-light rounded-xl p-3 border border-success/20 text-center">
-            <p className="text-xs text-success font-semibold">
-              ✓ Productos agregados. Los tendremos listos en tu cita.
+          {cartCount > 0 && (
+            <p className="text-xs font-semibold text-brand pt-1 border-t border-border">
+              {cartCount} producto{cartCount > 1 ? "s" : ""} · ${cartTotal.toFixed(2)}
             </p>
-          </div>
-        )}
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              setStep("service");
-              setService(null);
-              setTime("");
-              setDayChosen(false);
-              setAppointmentId(null);
-              setCart({});
-              setProductsSaved(false);
-            }}
-            className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-foreground"
-          >
-            Otra cita
-          </button>
-          <button
-            onClick={() => router.push("/citas")}
-            className="flex-1 h-11 rounded-xl bg-brand text-white text-sm font-semibold"
-          >
-            Mis reservas
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Render: service selection ──────────────────────────────────────────────
-
-  if (step === "service") {
-    return (
-      <div className="space-y-4">
-        <div className="flex rounded-xl bg-surface border border-border p-1">
-          {([
-            { key: "single", label: "Servicios" },
-            { key: "package", label: "Paquetes" },
-          ] as { key: Tab; label: string }[]).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "flex-1 h-9 rounded-lg text-sm font-semibold transition-colors",
-                tab === t.key ? "bg-brand text-white" : "text-muted"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+          )}
         </div>
 
-        {shown.length === 0 ? (
-          <p className="text-sm text-muted text-center py-8">
-            {tab === "package" ? "Aún no hay paquetes disponibles." : "Aún no hay servicios."}
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {shown.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  setService(s);
-                  setTime("");
-                  setDayChosen(false);
-                  setStep("datetime");
-                }}
-                className="w-full flex items-center gap-3 bg-surface rounded-2xl border border-border p-3.5 active:bg-background text-left"
-              >
-                {s.image_url ? (
-                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
-                    <Image
-                      src={s.image_url}
-                      alt={s.name}
-                      width={56}
-                      height={56}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center"
-                    style={{ background: `${s.color}26` }}
-                  >
-                    {s.kind === "package" ? (
-                      <Sparkles size={20} style={{ color: s.color }} />
-                    ) : (
-                      <Scissors size={20} style={{ color: s.color }} />
-                    )}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground">{s.name}</p>
-                  <p className="text-xs text-muted">{s.duration_minutes} min</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <p className="text-sm font-bold text-foreground">${s.price}</p>
-                  <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
-                    <span className="text-white font-bold text-base leading-none">+</span>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+        <button
+          onClick={() => setStep("datetime")}
+          className="w-full h-12 rounded-xl bg-brand text-white font-semibold"
+        >
+          {cartCount > 0 ? "Continuar con productos →" : "Continuar sin productos →"}
+        </button>
       </div>
     );
   }
@@ -559,24 +629,24 @@ export function BookingFlow({
           onClick={() => {
             releaseHolds();
             setTime("");
-            setStep("service");
+            setStep("products");
           }}
           className="flex items-center gap-2 text-sm text-muted"
         >
-          <ChevronLeft size={16} /> Cambiar servicio
+          <ChevronLeft size={16} /> Volver
         </button>
 
         <div className="bg-surface rounded-xl border border-border p-3 flex items-center gap-3">
           <div className="w-2 h-10 rounded-full shrink-0" style={{ background: service?.color }} />
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-foreground">{service?.name}</p>
             <p className="text-xs text-muted">
               {service?.duration_minutes} min · ${service?.price}
+              {cartCount > 0 && ` · +${cartCount} producto${cartCount > 1 ? "s" : ""}`}
             </p>
           </div>
         </div>
 
-        {/* Calendar — collapses to a single row after a day is chosen */}
         {dayChosen ? (
           <div className="bg-surface rounded-2xl border border-border p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center shrink-0">
@@ -695,7 +765,6 @@ export function BookingFlow({
           </div>
         )}
 
-        {/* Time slots — only after a day is chosen */}
         {dayChosen &&
           (!dayAvail ? (
             <p className="text-sm text-muted text-center py-3 bg-surface rounded-xl border border-border">
@@ -715,7 +784,7 @@ export function BookingFlow({
                 Selecciona una hora
               </p>
               {holdError && <p className="text-xs text-danger">{holdError}</p>}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 lg:grid-cols-5 gap-2">
                 {slots.map((s) => (
                   <button
                     key={s}
@@ -734,7 +803,6 @@ export function BookingFlow({
             </div>
           ))}
 
-        {/* Hold countdown */}
         {holdActive && time && (
           <div className="flex items-center justify-center gap-2 bg-brand-light rounded-xl p-3 border border-brand/20">
             <Timer size={15} className="text-brand" />
@@ -749,13 +817,15 @@ export function BookingFlow({
           onClick={() => setStep("confirm")}
           className="w-full h-12 rounded-xl bg-brand text-white font-semibold disabled:opacity-40"
         >
-          Continuar →
+          Revisar y confirmar →
         </button>
       </div>
     );
   }
 
-  // ── Render: confirm ────────────────────────────────────────────────────────
+  // ── Render: confirm — full summary ─────────────────────────────────────────
+
+  const grandTotal = (service?.price ?? 0) + cartTotal;
 
   return (
     <div className="space-y-5">
@@ -772,21 +842,37 @@ export function BookingFlow({
         </div>
       )}
 
-      <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
-        <SummaryRow label="Servicio" value={service?.name ?? ""} />
-        <SummaryRow label="Duración" value={`${service?.duration_minutes} minutos`} />
-        <SummaryRow
-          label="Fecha"
-          value={format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM yyyy", { locale: es })}
-        />
-        <SummaryRow label="Hora" value={fmtSlot(time)} />
-        <SummaryRow label="Precio" value={`$${service?.price.toFixed(2)}`} />
-      </div>
-
-      <div className="bg-brand-light rounded-xl p-3 border border-brand/20">
-        <p className="text-xs text-brand font-semibold">
-          ℹ️ El pago se realiza en el local al momento de la cita.
+      <div>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
+          Resumen de tu reserva
         </p>
+        <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
+          <SummaryRow label="Barbero" value="Amado" />
+          <SummaryRow label="Servicio" value={service?.name ?? ""} />
+          <SummaryRow label="Duración" value={`${service?.duration_minutes} minutos`} />
+          <SummaryRow
+            label="Fecha"
+            value={format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM yyyy", { locale: es })}
+          />
+          <SummaryRow label="Hora" value={fmtSlot(time)} />
+          <SummaryRow label="Servicio" value={`$${(service?.price ?? 0).toFixed(2)}`} />
+          {cartItems.map(([id, q]) => {
+            const p = products.find((pp) => pp.id === id);
+            if (!p) return null;
+            return (
+              <SummaryRow
+                key={id}
+                label={`${q}× ${p.name}`}
+                value={`$${(Number(p.price) * q).toFixed(2)}`}
+              />
+            );
+          })}
+          <SummaryRow label="Método de pago" value="En el local" />
+          <div className="flex items-center justify-between px-4 py-3 gap-3 bg-brand-light">
+            <span className="text-sm font-bold text-foreground">Total</span>
+            <span className="text-base font-black text-brand">${grandTotal.toFixed(2)}</span>
+          </div>
+        </div>
       </div>
 
       {error && <p className="text-sm text-danger text-center">{error}</p>}
