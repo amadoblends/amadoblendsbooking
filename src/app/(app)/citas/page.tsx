@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import { Calendar, Clock } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function MisCitasPage() {
   const supabase = await createClient();
@@ -40,6 +41,7 @@ export default async function MisCitasPage() {
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
+      <RealtimeRefresher tables={["appointments"]} />
       <header>
         <h1 className="text-xl font-bold text-foreground">Mis citas</h1>
       </header>

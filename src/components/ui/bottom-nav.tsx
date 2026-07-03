@@ -44,7 +44,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 bg-surface border-t border-border pb-[max(0px,var(--safe-bottom))]">
-      <div className="flex items-center justify-around h-16">
+      <div className="flex items-center justify-around h-16 w-full max-w-[560px] mx-auto">
         {left.map((item) => (
           <NavItem key={item.href} {...item} active={path === item.href} />
         ))}

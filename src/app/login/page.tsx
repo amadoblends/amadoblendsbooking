@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Scissors, Loader2, Mail, Lock, User, Phone } from "lucide-react";
+import { Scissors, Loader2, Mail, Lock, User, Phone, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -135,7 +135,7 @@ export default function LoginPage() {
             </>
           )}
           <Field icon={<Mail size={15} />} type="email" placeholder="Correo electrónico" value={email} onChange={setEmail} />
-          <Field icon={<Lock size={15} />} type="password" placeholder="Contraseña" value={password} onChange={setPassword} />
+          <PasswordField value={password} onChange={setPassword} />
 
           {error && <p className="text-xs text-danger text-center">{error}</p>}
           {success && <p className="text-xs text-success text-center">{success}</p>}
@@ -182,6 +182,34 @@ function Field({
         className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand placeholder:text-muted"
         required
       />
+    </div>
+  );
+}
+
+function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
+        <Lock size={15} />
+      </div>
+      <input
+        type={show ? "text" : "password"}
+        placeholder="Contraseña"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        minLength={6}
+        className="w-full h-12 pl-10 pr-12 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand placeholder:text-muted"
+        required
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-muted"
+      >
+        {show ? <EyeOff size={17} /> : <Eye size={17} />}
+      </button>
     </div>
   );
 }

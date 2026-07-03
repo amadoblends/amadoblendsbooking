@@ -23,18 +23,24 @@ export default async function ReservarPage({
 
   if (!client) redirect("/configurar-perfil");
 
-  const [{ data: services }, { data: availability }, { data: settings }] = await Promise.all([
-    supabase
-      .from("services")
-      .select("id, name, duration_minutes, price, color, image_url, kind")
-      .order("price"),
-    supabase.from("availability").select("*").order("weekday"),
-    supabase
-      .from("booking_settings")
-      .select("booking_window_days, min_notice_minutes")
-      .eq("id", 1)
-      .single(),
-  ]);
+  const [{ data: services }, { data: availability }, { data: settings }, { data: products }] =
+    await Promise.all([
+      supabase
+        .from("services")
+        .select("id, name, duration_minutes, price, color, image_url, kind")
+        .order("price"),
+      supabase.from("availability").select("*").order("weekday"),
+      supabase
+        .from("booking_settings")
+        .select("booking_window_days, min_notice_minutes")
+        .eq("id", 1)
+        .single(),
+      supabase
+        .from("products")
+        .select("id, name, price, image_url")
+        .gt("stock", 0)
+        .order("name"),
+    ]);
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4">
@@ -46,6 +52,7 @@ export default async function ReservarPage({
       <BookingFlow
         clientId={client.id}
         services={services ?? []}
+        products={products ?? []}
         availability={availability ?? []}
         bookingWindowDays={settings?.booking_window_days ?? 30}
         minNoticeMinutes={settings?.min_notice_minutes ?? 60}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import {
   addMonths, subMonths, startOfMonth, endOfMonth,
@@ -8,7 +8,10 @@ import {
   isSameMonth, isSameDay, isBefore, isAfter, startOfDay, addDays, addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Check, Loader2, Scissors, Sparkles } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Check, Loader2, Scissors, Sparkles,
+  CalendarDays, Timer, ShoppingBag, Minus, Plus,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -23,6 +26,13 @@ interface Service {
   color: string;
   image_url: string | null;
   kind: "single" | "package";
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string | null;
 }
 
 interface AvailDay {
@@ -43,6 +53,7 @@ interface BusyInterval {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const WEEK_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
+const HOLD_SECONDS = 60;
 
 function toMins(t: string) {
   const [h, m] = t.split(":").map(Number);
@@ -78,12 +89,9 @@ function generateSlots(
   const out: string[] = [];
 
   for (let t = start; t + durMins <= end; t += step) {
-    // Break window
     if (bS !== null && bE !== null && t < bE && t + durMins > bS) continue;
-    // Min notice
     const slotStart = slotToDate(dateStr, t);
     if (isBefore(slotStart, nowPlusNotice)) continue;
-    // Already-booked overlap
     const sMs = slotStart.getTime();
     const eMs = sMs + durMins * 60000;
     if (busy.some((b) => sMs < b.end && eMs > b.start)) continue;
@@ -100,6 +108,7 @@ type Tab = "single" | "package";
 export function BookingFlow({
   clientId,
   services,
+  products,
   availability,
   bookingWindowDays,
   minNoticeMinutes,
@@ -107,6 +116,7 @@ export function BookingFlow({
 }: {
   clientId: string;
   services: Service[];
+  products: Product[];
   availability: AvailDay[];
   bookingWindowDays: number;
   minNoticeMinutes: number;
@@ -122,12 +132,24 @@ export function BookingFlow({
   const [tab, setTab] = useState<Tab>("single");
   const [service, setService] = useState<Service | null>(initService);
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [dayChosen, setDayChosen] = useState(false); // collapses the calendar
   const [time, setTime] = useState("");
   const [calCursor, setCalCursor] = useState(startOfMonth(new Date()));
-  const [busy, setBusy] = useState<BusyInterval[]>([]);
+  const [monthBusy, setMonthBusy] = useState<BusyInterval[]>([]);
   const [busyLoading, setBusyLoading] = useState(false);
+  const [busyVersion, setBusyVersion] = useState(0); // bump to refetch
+  const [holdExpiresAt, setHoldExpiresAt] = useState<number | null>(null);
+  const [holdSecondsLeft, setHoldSecondsLeft] = useState(HOLD_SECONDS);
+  const [holdError, setHoldError] = useState<string | null>(null);
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Products add-on state (success step)
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [productsSaved, setProductsSaved] = useState(false);
+  const [savingProducts, setSavingProducts] = useState(false);
+
+  const holdActive = holdExpiresAt !== null;
 
   const today = startOfDay(new Date());
   const maxDate = addDays(today, bookingWindowDays);
@@ -137,28 +159,32 @@ export function BookingFlow({
   const packages = services.filter((s) => s.kind === "package");
   const shown = tab === "single" ? singles : packages;
 
-  const dayAvail = useMemo(() => {
-    const wd = new Date(date + "T00:00:00").getDay();
-    return availability.find((d) => d.weekday === wd && d.is_active) ?? null;
-  }, [date, availability]);
+  const getDayAvail = useCallback(
+    (dateStr: string) => {
+      const wd = new Date(dateStr + "T00:00:00").getDay();
+      return availability.find((d) => d.weekday === wd && d.is_active) ?? null;
+    },
+    [availability]
+  );
 
-  // Fetch busy intervals whenever the selected date changes
+  const dayAvail = useMemo(() => getDayAvail(date), [date, getDayAvail]);
+
+  // ── Busy times for the whole visible month (capacity + slots) ─────────────
   useEffect(() => {
-    if (step !== "datetime") return;
+    if (step !== "datetime" && step !== "confirm") return;
     let alive = true;
     setBusyLoading(true);
     const supabase = createBrowser();
-    const [y, mo, d] = date.split("-").map(Number);
-    const dayStart = new Date(y, mo - 1, d, 0, 0, 0);
-    const dayEnd = new Date(y, mo - 1, d, 23, 59, 59);
+    const gridStart = startOfWeek(startOfMonth(calCursor), { weekStartsOn: 1 });
+    const gridEnd = addDays(endOfWeek(endOfMonth(calCursor), { weekStartsOn: 1 }), 1);
     supabase
       .rpc("get_busy_times", {
-        p_start: dayStart.toISOString(),
-        p_end: dayEnd.toISOString(),
+        p_start: gridStart.toISOString(),
+        p_end: gridEnd.toISOString(),
       })
       .then(({ data }) => {
         if (!alive) return;
-        setBusy(
+        setMonthBusy(
           (data ?? []).map((b: { starts_at: string; ends_at: string }) => ({
             start: new Date(b.starts_at).getTime(),
             end: new Date(b.ends_at).getTime(),
@@ -169,12 +195,96 @@ export function BookingFlow({
     return () => {
       alive = false;
     };
-  }, [date, step]);
+  }, [calCursor, step, busyVersion]);
 
   const slots = useMemo(() => {
     if (!dayAvail || !service) return [];
-    return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, busy);
-  }, [dayAvail, service, date, minNoticeMinutes, busy]);
+    return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, monthBusy);
+  }, [dayAvail, service, date, minNoticeMinutes, monthBusy]);
+
+  // Remaining capacity per visible day (shown under the day number)
+  const dayCapacity = useCallback(
+    (d: Date): number | null => {
+      if (!service) return null;
+      const wd = d.getDay();
+      if (!activeWeekdays.has(wd)) return null;
+      if (isBefore(startOfDay(d), today) || isAfter(startOfDay(d), maxDate)) return null;
+      const ds = format(d, "yyyy-MM-dd");
+      const avail = getDayAvail(ds);
+      if (!avail) return null;
+      return generateSlots(avail, service.duration_minutes, minNoticeMinutes, ds, monthBusy)
+        .length;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [service, monthBusy, minNoticeMinutes, getDayAvail]
+  );
+
+  // ── Hold management ────────────────────────────────────────────────────────
+
+  const releaseHolds = useCallback(() => {
+    setHoldExpiresAt(null);
+    createBrowser().rpc("release_my_holds").then(() => {});
+  }, []);
+
+  // Release on unmount / page close
+  const releaseRef = useRef(releaseHolds);
+  releaseRef.current = releaseHolds;
+  useEffect(() => {
+    const onHide = () => releaseRef.current();
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      releaseRef.current();
+    };
+  }, []);
+
+  // Countdown tick
+  useEffect(() => {
+    if (holdExpiresAt === null) return;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((holdExpiresAt - Date.now()) / 1000));
+      setHoldSecondsLeft(left);
+      if (left === 0) {
+        setHoldExpiresAt(null);
+        setTime("");
+        setHoldError("Tu reserva temporal expiró. Elige una hora de nuevo.");
+        setBusyVersion((v) => v + 1);
+        if (step === "confirm") setStep("datetime");
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [holdExpiresAt, step]);
+
+  async function selectTime(slot: string) {
+    setHoldError(null);
+    setTime(slot);
+    const supabase = createBrowser();
+    const [h, mi] = slot.split(":").map(Number);
+    const startsAt = slotToDate(date, h * 60 + mi);
+    const endsAt = new Date(startsAt.getTime() + (service?.duration_minutes ?? 30) * 60000);
+    const { data: holdId } = await supabase.rpc("hold_slot", {
+      p_starts: startsAt.toISOString(),
+      p_ends: endsAt.toISOString(),
+    });
+    if (!holdId) {
+      setTime("");
+      setHoldError("Ese horario acaba de ocuparse. Elige otro.");
+      setBusyVersion((v) => v + 1);
+      return;
+    }
+    setHoldExpiresAt(Date.now() + HOLD_SECONDS * 1000);
+    setHoldSecondsLeft(HOLD_SECONDS);
+  }
+
+  function resetToDatetime() {
+    releaseHolds();
+    setTime("");
+    setStep("datetime");
+  }
+
+  // ── Confirm ────────────────────────────────────────────────────────────────
 
   async function handleConfirm() {
     if (!service || !time) return;
@@ -186,51 +296,164 @@ export function BookingFlow({
     const startsAt = slotToDate(date, h * 60 + mi);
     const endsAt = new Date(startsAt.getTime() + service.duration_minutes * 60000);
 
-    const { error: insertError } = await supabase.from("appointments").insert({
-      client_id: clientId,
-      service_id: service.id,
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
-      price: service.price,
-      status: "pendiente",
-    });
+    const { data: inserted, error: insertError } = await supabase
+      .from("appointments")
+      .insert({
+        client_id: clientId,
+        service_id: service.id,
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
+        price: service.price,
+        status: "pendiente",
+      })
+      .select("id")
+      .single();
 
-    if (insertError) {
+    if (insertError || !inserted) {
       setError(
-        insertError.code === "23P01"
+        insertError?.code === "23P01"
           ? "Ese horario acaba de ocuparse. Elige otro."
           : "No se pudo crear la cita. Intenta de nuevo."
       );
       setLoading(false);
-      if (insertError.code === "23P01") setStep("datetime");
-    } else {
-      setStep("success");
-      setLoading(false);
+      if (insertError?.code === "23P01") resetToDatetime();
+      return;
     }
+
+    setAppointmentId(inserted.id);
+    releaseHolds();
+    setStep("success");
+    setLoading(false);
   }
 
-  // ── Success ────────────────────────────────────────────────────────────────
+  async function saveProducts() {
+    if (!appointmentId) return;
+    const rows = Object.entries(cart)
+      .filter(([, q]) => q > 0)
+      .map(([productId, quantity]) => ({
+        appointment_id: appointmentId,
+        product_id: productId,
+        quantity,
+      }));
+    if (rows.length === 0) return;
+    setSavingProducts(true);
+    const supabase = createBrowser();
+    await supabase.from("appointment_products").insert(rows);
+    setSavingProducts(false);
+    setProductsSaved(true);
+  }
+
+  // ── Render: success ────────────────────────────────────────────────────────
 
   if (step === "success") {
+    const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
     return (
-      <div className="flex flex-col items-center justify-center py-14 space-y-5 text-center">
-        <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center">
-          <Check size={36} className="text-success" />
+      <div className="space-y-6 py-4">
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center">
+            <Check size={36} className="text-success" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">¡Reserva confirmada!</h2>
+            <p className="text-sm text-muted mt-1 capitalize">
+              {format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM", { locale: es })} ·{" "}
+              {fmtSlot(time)}
+            </p>
+            <p className="text-sm text-muted">{service?.name}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-foreground">¡Reserva confirmada!</h2>
-          <p className="text-sm text-muted mt-1 capitalize">
-            {format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM", { locale: es })} ·{" "}
-            {fmtSlot(time)}
-          </p>
-          <p className="text-sm text-muted">{service?.name}</p>
-        </div>
-        <div className="flex gap-3 w-full max-w-xs">
+
+        {/* Products add-on */}
+        {products.length > 0 && !productsSaved && (
+          <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={17} className="text-brand" />
+              <p className="font-semibold text-sm text-foreground">
+                ¿Quieres agregar productos a tu visita?
+              </p>
+            </div>
+            <p className="text-xs text-muted">
+              Los preparamos para que los recojas y pagues en tu cita.
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {products.map((p) => {
+                const qty = cart[p.id] ?? 0;
+                return (
+                  <div key={p.id} className="flex items-center gap-3">
+                    {p.image_url ? (
+                      <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                        <Image
+                          src={p.image_url}
+                          alt={p.name}
+                          width={40}
+                          height={40}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center shrink-0">
+                        <ShoppingBag size={15} className="text-brand/60" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
+                      <p className="text-xs text-muted">${p.price}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() =>
+                          setCart((c) => ({ ...c, [p.id]: Math.max(0, (c[p.id] ?? 0) - 1) }))
+                        }
+                        disabled={qty === 0}
+                        className="w-7 h-7 rounded-full border border-border flex items-center justify-center disabled:opacity-30"
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span className="text-sm font-bold text-foreground w-4 text-center">
+                        {qty}
+                      </span>
+                      <button
+                        onClick={() => setCart((c) => ({ ...c, [p.id]: (c[p.id] ?? 0) + 1 }))}
+                        className="w-7 h-7 rounded-full bg-brand flex items-center justify-center"
+                      >
+                        <Plus size={13} className="text-white" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {cartCount > 0 && (
+              <button
+                onClick={saveProducts}
+                disabled={savingProducts}
+                className="w-full h-11 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {savingProducts && <Loader2 size={15} className="animate-spin" />}
+                Agregar {cartCount} producto{cartCount > 1 ? "s" : ""}
+              </button>
+            )}
+          </div>
+        )}
+
+        {productsSaved && (
+          <div className="bg-success-light rounded-xl p-3 border border-success/20 text-center">
+            <p className="text-xs text-success font-semibold">
+              ✓ Productos agregados. Los tendremos listos en tu cita.
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
           <button
             onClick={() => {
               setStep("service");
               setService(null);
               setTime("");
+              setDayChosen(false);
+              setAppointmentId(null);
+              setCart({});
+              setProductsSaved(false);
             }}
             className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-foreground"
           >
@@ -247,12 +470,11 @@ export function BookingFlow({
     );
   }
 
-  // ── Service selection ──────────────────────────────────────────────────────
+  // ── Render: service selection ──────────────────────────────────────────────
 
   if (step === "service") {
     return (
       <div className="space-y-4">
-        {/* Tabs */}
         <div className="flex rounded-xl bg-surface border border-border p-1">
           {([
             { key: "single", label: "Servicios" },
@@ -283,6 +505,7 @@ export function BookingFlow({
                 onClick={() => {
                   setService(s);
                   setTime("");
+                  setDayChosen(false);
                   setStep("datetime");
                 }}
                 className="w-full flex items-center gap-3 bg-surface rounded-2xl border border-border p-3.5 active:bg-background text-left"
@@ -327,13 +550,17 @@ export function BookingFlow({
     );
   }
 
-  // ── Date & time ────────────────────────────────────────────────────────────
+  // ── Render: date & time ────────────────────────────────────────────────────
 
   if (step === "datetime") {
     return (
       <div className="space-y-5">
         <button
-          onClick={() => setStep("service")}
+          onClick={() => {
+            releaseHolds();
+            setTime("");
+            setStep("service");
+          }}
           className="flex items-center gap-2 text-sm text-muted"
         >
           <ChevronLeft size={16} /> Cambiar servicio
@@ -349,112 +576,176 @@ export function BookingFlow({
           </div>
         </div>
 
-        {/* Calendar */}
-        <div className="bg-surface rounded-2xl border border-border p-4">
-          <div className="flex items-center justify-between mb-3">
+        {/* Calendar — collapses to a single row after a day is chosen */}
+        {dayChosen ? (
+          <div className="bg-surface rounded-2xl border border-border p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center shrink-0">
+              <CalendarDays size={18} className="text-brand" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-foreground capitalize">
+                {format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM", { locale: es })}
+              </p>
+              <p className="text-xs text-muted">Ahora selecciona una hora disponible</p>
+            </div>
             <button
-              onClick={() => setCalCursor((c) => subMonths(c, 1))}
-              className="w-8 h-8 rounded-full border border-border flex items-center justify-center"
+              onClick={() => {
+                setDayChosen(false);
+                releaseHolds();
+                setTime("");
+              }}
+              className="text-xs font-semibold text-brand shrink-0"
             >
-              <ChevronLeft size={14} />
-            </button>
-            <p className="font-semibold text-sm text-foreground capitalize">
-              {format(calCursor, "MMMM yyyy", { locale: es })}
-            </p>
-            <button
-              onClick={() => setCalCursor((c) => addMonths(c, 1))}
-              className="w-8 h-8 rounded-full border border-border flex items-center justify-center"
-            >
-              <ChevronRight size={14} />
+              Cambiar
             </button>
           </div>
-
-          <div className="grid grid-cols-7 gap-0.5 mb-1">
-            {WEEK_LABELS.map((w, i) => (
-              <div key={i} className="text-center text-[10px] font-semibold text-muted py-1">
-                {w}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5">
-            {eachDayOfInterval({
-              start: startOfWeek(startOfMonth(calCursor), { weekStartsOn: 1 }),
-              end: endOfWeek(endOfMonth(calCursor), { weekStartsOn: 1 }),
-            }).map((d) => {
-              const wd = d.getDay();
-              const inMonth = isSameMonth(d, calCursor);
-              const disabled =
-                !activeWeekdays.has(wd) ||
-                isBefore(startOfDay(d), today) ||
-                isAfter(startOfDay(d), maxDate);
-              const isSelected = isSameDay(d, new Date(date + "T00:00:00"));
-              const isToday = isSameDay(d, new Date());
-
-              return (
-                <button
-                  key={d.toISOString()}
-                  onClick={() => {
-                    if (!disabled) {
-                      setDate(format(d, "yyyy-MM-dd"));
-                      setTime("");
-                    }
-                  }}
-                  className={cn(
-                    "aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-colors",
-                    !inMonth && "text-muted/30",
-                    disabled && "text-muted/25 cursor-not-allowed",
-                    !disabled && inMonth && "text-foreground",
-                    isSelected && "bg-brand text-white font-bold",
-                    !isSelected && isToday && "border border-brand text-brand font-bold"
-                  )}
-                >
-                  {format(d, "d")}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Time slots */}
-        {!dayAvail ? (
-          <p className="text-sm text-muted text-center py-3 bg-surface rounded-xl border border-border">
-            No hay horario para este día. Selecciona otro.
-          </p>
-        ) : busyLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 size={20} className="animate-spin text-muted" />
-          </div>
-        ) : slots.length === 0 ? (
-          <p className="text-sm text-muted text-center py-3 bg-surface rounded-xl border border-border">
-            Sin horarios disponibles este día. Prueba otra fecha.
-          </p>
         ) : (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wide">
-              Selecciona una hora
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {slots.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setTime(s)}
-                  className={cn(
-                    "h-11 rounded-xl text-sm font-semibold border transition-colors",
-                    time === s
-                      ? "bg-brand border-brand text-white"
-                      : "border-border text-foreground bg-surface active:bg-background"
-                  )}
-                >
-                  {fmtSlot(s)}
-                </button>
+          <div className="bg-surface rounded-2xl border border-border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => setCalCursor((c) => subMonths(c, 1))}
+                className="w-8 h-8 rounded-full border border-border flex items-center justify-center"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <p className="font-semibold text-sm text-foreground capitalize">
+                {format(calCursor, "MMMM yyyy", { locale: es })}
+              </p>
+              <button
+                onClick={() => setCalCursor((c) => addMonths(c, 1))}
+                className="w-8 h-8 rounded-full border border-border flex items-center justify-center"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-0.5 mb-1">
+              {WEEK_LABELS.map((w, i) => (
+                <div key={i} className="text-center text-[10px] font-semibold text-muted py-1">
+                  {w}
+                </div>
               ))}
             </div>
+
+            <div className="grid grid-cols-7 gap-0.5">
+              {eachDayOfInterval({
+                start: startOfWeek(startOfMonth(calCursor), { weekStartsOn: 1 }),
+                end: endOfWeek(endOfMonth(calCursor), { weekStartsOn: 1 }),
+              }).map((d) => {
+                const wd = d.getDay();
+                const inMonth = isSameMonth(d, calCursor);
+                const capacity = dayCapacity(d);
+                const disabled =
+                  !activeWeekdays.has(wd) ||
+                  isBefore(startOfDay(d), today) ||
+                  isAfter(startOfDay(d), maxDate) ||
+                  capacity === 0;
+                const isSelected = isSameDay(d, new Date(date + "T00:00:00"));
+                const isToday = isSameDay(d, new Date());
+
+                return (
+                  <button
+                    key={d.toISOString()}
+                    onClick={() => {
+                      if (!disabled) {
+                        setDate(format(d, "yyyy-MM-dd"));
+                        setTime("");
+                        setDayChosen(true);
+                      }
+                    }}
+                    className={cn(
+                      "aspect-square rounded-xl flex flex-col items-center justify-center transition-colors leading-none gap-0.5",
+                      !inMonth && "opacity-30",
+                      disabled && "cursor-not-allowed",
+                      isSelected && "bg-brand",
+                      !isSelected && isToday && "border border-brand"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        disabled ? "text-muted/30" : "text-foreground",
+                        isSelected && "text-white font-bold",
+                        !isSelected && isToday && "text-brand font-bold"
+                      )}
+                    >
+                      {format(d, "d")}
+                    </span>
+                    {capacity !== null && inMonth && (
+                      <span
+                        className={cn(
+                          "text-[9px] font-semibold",
+                          isSelected
+                            ? "text-white/80"
+                            : capacity === 0
+                              ? "text-danger/60"
+                              : "text-success"
+                        )}
+                      >
+                        {capacity}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted mt-2 text-center">
+              El número indica los cupos disponibles de cada día.
+            </p>
+          </div>
+        )}
+
+        {/* Time slots — only after a day is chosen */}
+        {dayChosen &&
+          (!dayAvail ? (
+            <p className="text-sm text-muted text-center py-3 bg-surface rounded-xl border border-border">
+              No hay horario para este día. Selecciona otro.
+            </p>
+          ) : busyLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 size={20} className="animate-spin text-muted" />
+            </div>
+          ) : slots.length === 0 ? (
+            <p className="text-sm text-muted text-center py-3 bg-surface rounded-xl border border-border">
+              Sin horarios disponibles este día. Prueba otra fecha.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wide">
+                Selecciona una hora
+              </p>
+              {holdError && <p className="text-xs text-danger">{holdError}</p>}
+              <div className="grid grid-cols-3 gap-2">
+                {slots.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => selectTime(s)}
+                    className={cn(
+                      "h-11 rounded-xl text-sm font-semibold border transition-colors",
+                      time === s
+                        ? "bg-brand border-brand text-white"
+                        : "border-border text-foreground bg-surface active:bg-background"
+                    )}
+                  >
+                    {fmtSlot(s)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+
+        {/* Hold countdown */}
+        {holdActive && time && (
+          <div className="flex items-center justify-center gap-2 bg-brand-light rounded-xl p-3 border border-brand/20">
+            <Timer size={15} className="text-brand" />
+            <p className="text-xs text-brand font-semibold">
+              Tu horario está reservado por 0:{String(holdSecondsLeft).padStart(2, "0")}
+            </p>
           </div>
         )}
 
         <button
-          disabled={!time}
+          disabled={!time || !holdActive}
           onClick={() => setStep("confirm")}
           className="w-full h-12 rounded-xl bg-brand text-white font-semibold disabled:opacity-40"
         >
@@ -464,16 +755,22 @@ export function BookingFlow({
     );
   }
 
-  // ── Confirm ────────────────────────────────────────────────────────────────
+  // ── Render: confirm ────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-5">
-      <button
-        onClick={() => setStep("datetime")}
-        className="flex items-center gap-2 text-sm text-muted"
-      >
+      <button onClick={resetToDatetime} className="flex items-center gap-2 text-sm text-muted">
         <ChevronLeft size={16} /> Volver
       </button>
+
+      {holdActive && (
+        <div className="flex items-center justify-center gap-2 bg-brand-light rounded-xl p-3 border border-brand/20">
+          <Timer size={15} className="text-brand" />
+          <p className="text-xs text-brand font-semibold">
+            Tu horario está reservado por 0:{String(holdSecondsLeft).padStart(2, "0")}
+          </p>
+        </div>
+      )}
 
       <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
         <SummaryRow label="Servicio" value={service?.name ?? ""} />
