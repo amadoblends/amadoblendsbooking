@@ -13,7 +13,7 @@ export function NotificationBell({ clientId }: { clientId: string }) {
 
     async function load() {
       const { count: c } = await supabase
-        .from("notifications")
+        .from("client_notifications")
         .select("*", { count: "exact", head: true })
         .eq("client_id", clientId)
         .eq("read", false);
@@ -25,7 +25,12 @@ export function NotificationBell({ clientId }: { clientId: string }) {
       .channel("notif-bell")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `client_id=eq.${clientId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "client_notifications",
+          filter: `client_id=eq.${clientId}`,
+        },
         load
       )
       .subscribe();

@@ -21,7 +21,7 @@ export default async function NotificacionesPage() {
   if (!client) redirect("/configurar-perfil");
 
   const { data: notifications } = await supabase
-    .from("notifications")
+    .from("client_notifications")
     .select("id, title, body, type, read, created_at")
     .eq("client_id", client.id)
     .order("created_at", { ascending: false })

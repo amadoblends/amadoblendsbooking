@@ -47,7 +47,7 @@ export function NotificationsList({
     const unread = notifications.filter((n) => !n.read).map((n) => n.id);
     if (unread.length > 0) {
       supabase
-        .from("notifications")
+        .from("client_notifications")
         .update({ read: true })
         .in("id", unread)
         .then(() => {});
@@ -57,7 +57,12 @@ export function NotificationsList({
       .channel("notif-client")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `client_id=eq.${clientId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "client_notifications",
+          filter: `client_id=eq.${clientId}`,
+        },
         () => router.refresh()
       )
       .subscribe();
