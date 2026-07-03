@@ -24,15 +24,22 @@ export default async function ReservarPage({
   if (!client) redirect("/configurar-perfil");
 
   const [{ data: services }, { data: availability }, { data: settings }] = await Promise.all([
-    supabase.from("services").select("id, name, duration_minutes, price, color, image_url").order("price"),
+    supabase
+      .from("services")
+      .select("id, name, duration_minutes, price, color, image_url, kind")
+      .order("price"),
     supabase.from("availability").select("*").order("weekday"),
-    supabase.from("booking_settings").select("booking_window_days, min_notice_minutes").eq("id", 1).single(),
+    supabase
+      .from("booking_settings")
+      .select("booking_window_days, min_notice_minutes")
+      .eq("id", 1)
+      .single(),
   ]);
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4">
       <header className="mb-5">
-        <h1 className="text-xl font-bold text-foreground">Nueva cita</h1>
+        <h1 className="text-xl font-bold text-foreground">Reservar cita</h1>
         <p className="text-sm text-muted">Elige tu servicio y horario</p>
       </header>
 

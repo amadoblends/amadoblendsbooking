@@ -2,15 +2,42 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Scissors, User } from "lucide-react";
+import { Home, Calendar, Plus, ShoppingBag, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const nav = [
+const left = [
   { href: "/", label: "Inicio", icon: Home },
-  { href: "/citas", label: "Mis citas", icon: Calendar },
-  { href: "/reservar", label: "Reservar", icon: Scissors, cta: true },
+  { href: "/citas", label: "Reservas", icon: Calendar },
+];
+const right = [
+  { href: "/tienda", label: "Tienda", icon: ShoppingBag },
   { href: "/perfil", label: "Perfil", icon: User },
 ];
+
+function NavItem({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: typeof Home;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex flex-col items-center gap-1 min-w-[56px] py-1",
+        active ? "text-brand" : "text-muted"
+      )}
+    >
+      <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
+      <span className="text-[10px] font-medium">{label}</span>
+    </Link>
+  );
+}
 
 export function BottomNav() {
   const path = usePathname();
@@ -18,35 +45,17 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 bg-surface border-t border-border pb-[max(0px,var(--safe-bottom))]">
       <div className="flex items-center justify-around h-16">
-        {nav.map((item) => {
-          const active = path === item.href;
-          if (item.cta) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-1"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-brand flex items-center justify-center shadow-lg shadow-brand/30">
-                  <item.icon size={22} className="text-white" />
-                </div>
-              </Link>
-            );
-          }
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center gap-1 min-w-[56px] py-1",
-                active ? "text-brand" : "text-muted"
-              )}
-            >
-              <item.icon size={21} strokeWidth={active ? 2.2 : 1.8} />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
+        {left.map((item) => (
+          <NavItem key={item.href} {...item} active={path === item.href} />
+        ))}
+        <Link href="/reservar" aria-label="Reservar cita" className="-mt-5">
+          <div className="w-[52px] h-[52px] rounded-2xl bg-brand flex items-center justify-center shadow-lg shadow-brand/40 active:scale-95 transition-transform">
+            <Plus size={26} className="text-white" />
+          </div>
+        </Link>
+        {right.map((item) => (
+          <NavItem key={item.href} {...item} active={path === item.href} />
+        ))}
       </div>
     </nav>
   );
