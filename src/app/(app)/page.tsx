@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Bell, CalendarPlus, Clock, Scissors, ShoppingBag, UserPlus } from "lucide-react";
+import { CalendarPlus, Clock, Scissors, ShoppingBag, UserPlus } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 const quickAccess = [
   { href: "/reservar", label: "Reservar cita", icon: CalendarPlus },
@@ -62,12 +63,7 @@ export default async function HomePage() {
             AMADOBLENDS
           </span>
         </div>
-        <Link
-          href="/citas"
-          className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center"
-        >
-          <Bell size={17} className="text-muted" />
-        </Link>
+        <NotificationBell clientId={client.id} />
       </header>
 
       {/* Greeting */}

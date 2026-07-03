@@ -27,6 +27,18 @@ interface Service {
   color: string;
   image_url: string | null;
   kind: "single" | "package";
+  description?: string | null;
+}
+
+interface Promotion {
+  id: string;
+  title: string;
+  discount_percent: number;
+  service_id: string | null;
+  weekdays: number[];
+  start_time: string | null;
+  end_time: string | null;
+  ends_on: string | null;
 }
 
 interface Product {
@@ -104,6 +116,34 @@ function generateSlots(
 type Step = "service" | "products" | "datetime" | "confirm" | "success";
 type Tab = "single" | "package";
 
+// Best applicable discount % for a service at a given date + time (0 if none)
+function discountFor(
+  promotions: Promotion[],
+  service: Service | null,
+  dateStr: string,
+  time: string
+): number {
+  if (!service || !dateStr) return 0;
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, mo - 1, d);
+  const weekday = date.getDay();
+  const slotMins = time ? toMins(time) : null;
+
+  let best = 0;
+  for (const p of promotions) {
+    if (p.service_id && p.service_id !== service.id) continue;
+    if (!p.weekdays.includes(weekday)) continue;
+    if (p.ends_on && dateStr > p.ends_on) continue;
+    if (p.start_time && p.end_time && slotMins !== null) {
+      const s = toMins(String(p.start_time).slice(0, 5));
+      const e = toMins(String(p.end_time).slice(0, 5));
+      if (slotMins < s || slotMins >= e) continue;
+    }
+    if (p.discount_percent > best) best = p.discount_percent;
+  }
+  return best;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function BookingFlow({
@@ -111,6 +151,7 @@ export function BookingFlow({
   services,
   products,
   availability,
+  promotions = [],
   bookingWindowDays,
   minNoticeMinutes,
   preselectedServiceId,
@@ -119,6 +160,7 @@ export function BookingFlow({
   services: Service[];
   products: Product[];
   availability: AvailDay[];
+  promotions?: Promotion[];
   bookingWindowDays: number;
   minNoticeMinutes: number;
   preselectedServiceId?: string;
@@ -165,6 +207,11 @@ export function BookingFlow({
     const p = products.find((pp) => pp.id === id);
     return a + (p ? Number(p.price) * q : 0);
   }, 0);
+
+  // Effective service price after the best applicable promotion
+  const discountPct = discountFor(promotions, service, date, time);
+  const basePrice = service?.price ?? 0;
+  const servicePrice = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
 
   const getDayAvail = useCallback(
     (dateStr: string) => {
@@ -307,7 +354,7 @@ export function BookingFlow({
         service_id: service.id,
         starts_at: startsAt.toISOString(),
         ends_at: endsAt.toISOString(),
-        price: service.price,
+        price: servicePrice,
         status: "pendiente",
       })
       .select("id")
@@ -355,7 +402,7 @@ export function BookingFlow({
   // ── Render: success ────────────────────────────────────────────────────────
 
   if (step === "success") {
-    const successTotal = (service?.price ?? 0) + cartTotal;
+    const successTotal = servicePrice + cartTotal;
     return (
       <div className="space-y-6 py-4">
         <div className="flex flex-col items-center text-center space-y-3">
@@ -374,6 +421,14 @@ export function BookingFlow({
           />
           <SummaryRow label="Hora" value={fmtSlot(time)} />
           <SummaryRow label="Duración" value={`${service?.duration_minutes} minutos`} />
+          {discountPct > 0 ? (
+            <SummaryRow
+              label={`Servicio (−${discountPct}% promo)`}
+              value={`$${servicePrice.toFixed(2)}`}
+            />
+          ) : (
+            <SummaryRow label="Servicio" value={`$${servicePrice.toFixed(2)}`} />
+          )}
           {cartItems.map(([id, q]) => {
             const p = products.find((pp) => pp.id === id);
             if (!p) return null;
@@ -499,36 +554,39 @@ export function BookingFlow({
                   setDayChosen(false);
                   setStep("products");
                 }}
-                className="w-full flex items-center gap-3 bg-surface rounded-2xl border border-border p-3.5 active:bg-background text-left"
+                className="w-full flex items-start gap-3 bg-surface rounded-2xl border border-border p-3.5 active:bg-background text-left"
               >
                 {s.image_url ? (
-                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0">
                     <Image
                       src={s.image_url}
                       alt={s.name}
-                      width={56}
-                      height={56}
+                      width={64}
+                      height={64}
                       className="w-full h-full object-cover"
                     />
                   </div>
                 ) : (
                   <div
-                    className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center"
+                    className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center"
                     style={{ background: `${s.color}26` }}
                   >
                     {s.kind === "package" ? (
-                      <Sparkles size={20} style={{ color: s.color }} />
+                      <Sparkles size={22} style={{ color: s.color }} />
                     ) : (
-                      <Scissors size={20} style={{ color: s.color }} />
+                      <Scissors size={22} style={{ color: s.color }} />
                     )}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-foreground">{s.name}</p>
-                  <p className="text-xs text-muted">{s.duration_minutes} min</p>
+                  {s.description && (
+                    <p className="text-xs text-muted line-clamp-2 mt-0.5">{s.description}</p>
+                  )}
+                  <p className="text-xs text-muted mt-0.5">⏱ {s.duration_minutes} min</p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <p className="text-sm font-bold text-foreground">${s.price}</p>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <p className="text-base font-bold text-brand">${s.price}</p>
                   <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
                     <span className="text-white font-bold text-base leading-none">+</span>
                   </div>
@@ -849,7 +907,7 @@ export function BookingFlow({
 
   // ── Render: confirm — full summary ─────────────────────────────────────────
 
-  const grandTotal = (service?.price ?? 0) + cartTotal;
+  const grandTotal = servicePrice + cartTotal;
 
   return (
     <div className="space-y-5">
@@ -879,7 +937,17 @@ export function BookingFlow({
             value={format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM yyyy", { locale: es })}
           />
           <SummaryRow label="Hora" value={fmtSlot(time)} />
-          <SummaryRow label="Servicio" value={`$${(service?.price ?? 0).toFixed(2)}`} />
+          {discountPct > 0 ? (
+            <>
+              <SummaryRow label="Precio normal" value={`$${basePrice.toFixed(2)}`} />
+              <SummaryRow
+                label={`Descuento (${discountPct}% promo)`}
+                value={`−$${(basePrice - servicePrice).toFixed(2)}`}
+              />
+            </>
+          ) : (
+            <SummaryRow label="Servicio" value={`$${servicePrice.toFixed(2)}`} />
+          )}
           {cartItems.map(([id, q]) => {
             const p = products.find((pp) => pp.id === id);
             if (!p) return null;
