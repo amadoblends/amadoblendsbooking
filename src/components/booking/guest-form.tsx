@@ -1,19 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, User, Phone, Mail, Check } from "lucide-react";
+import { Loader2, User, Phone, Mail, Check, Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+export interface GuestServiceOption {
+  id: string;
+  name: string;
+  duration_minutes: number;
+  price: number;
+}
 
 export function GuestForm({
   appointmentId,
+  services = [],
   onDone,
 }: {
   appointmentId: string;
+  services?: GuestServiceOption[];
   onDone: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [serviceId, setServiceId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +37,10 @@ export function GuestForm({
       setError("Ingresa un teléfono válido.");
       return;
     }
+    if (services.length > 0 && !serviceId) {
+      setError("Selecciona el servicio para tu invitado.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -36,6 +50,7 @@ export function GuestForm({
       full_name: name.trim(),
       phone: phone.trim(),
       email: email.trim() || null,
+      service_id: serviceId || null,
     });
 
     if (insertError) {
@@ -81,6 +96,26 @@ export function GuestForm({
           className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand placeholder:text-muted"
         />
       </div>
+
+      {/* Guest comes for a cut too — pick their service */}
+      {services.length > 0 && (
+        <div className="relative">
+          <Scissors size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+          <select
+            value={serviceId}
+            onChange={(e) => setServiceId(e.target.value)}
+            className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand appearance-none"
+            required
+          >
+            <option value="">¿Qué servicio quiere tu invitado?</option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.duration_minutes} min · ${s.price}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {error && <p className="text-xs text-danger text-center">{error}</p>}
 

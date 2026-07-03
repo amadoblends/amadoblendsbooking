@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GuestForm } from "./guest-form";
+import { GuestForm, type GuestServiceOption } from "./guest-form";
 
 interface AppointmentOption {
   id: string;
@@ -14,7 +14,13 @@ interface AppointmentOption {
   serviceName: string;
 }
 
-export function GuestAdder({ appointments }: { appointments: AppointmentOption[] }) {
+export function GuestAdder({
+  appointments,
+  services,
+}: {
+  appointments: AppointmentOption[];
+  services: GuestServiceOption[];
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<string>(
     appointments.length === 1 ? appointments[0].id : ""
@@ -83,7 +89,7 @@ export function GuestAdder({ appointments }: { appointments: AppointmentOption[]
       {selected && (
         <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
           <p className="font-semibold text-sm text-foreground">Datos del invitado</p>
-          <GuestForm appointmentId={selected} onDone={() => setDone(true)} />
+          <GuestForm appointmentId={selected} services={services} onDone={() => setDone(true)} />
         </div>
       )}
     </div>

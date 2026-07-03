@@ -46,7 +46,7 @@ export default async function CitaDetailPage({
         .eq("appointment_id", id),
       supabase
         .from("appointment_guests")
-        .select("id, full_name, phone")
+        .select("id, full_name, phone, services(name)")
         .eq("appointment_id", id),
       supabase.from("availability").select("*").order("weekday"),
       supabase.from("booking_settings").select("booking_window_days").eq("id", 1).single(),
@@ -141,12 +141,18 @@ export default async function CitaDetailPage({
             <Users size={15} className="text-brand" />
             <p className="text-xs font-semibold text-muted uppercase tracking-wide">Invitados</p>
           </div>
-          {guests.map((g) => (
-            <div key={g.id} className="flex items-center justify-between text-sm">
-              <span className="text-foreground font-medium">{g.full_name}</span>
-              <span className="text-muted">{g.phone}</span>
-            </div>
-          ))}
+          {guests.map((g) => {
+            const gs = g.services as unknown as { name: string } | null;
+            return (
+              <div key={g.id} className="flex items-center justify-between text-sm gap-3">
+                <div className="min-w-0">
+                  <p className="text-foreground font-medium truncate">{g.full_name}</p>
+                  {gs && <p className="text-xs text-muted">✂️ {gs.name}</p>}
+                </div>
+                <span className="text-muted shrink-0">{g.phone}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -355,24 +355,39 @@ export function BookingFlow({
   // ── Render: success ────────────────────────────────────────────────────────
 
   if (step === "success") {
+    const successTotal = (service?.price ?? 0) + cartTotal;
     return (
       <div className="space-y-6 py-4">
-        <div className="flex flex-col items-center text-center space-y-4">
+        <div className="flex flex-col items-center text-center space-y-3">
           <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center">
             <Check size={36} className="text-success" />
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-foreground">¡Reserva confirmada!</h2>
-            <p className="text-sm text-muted mt-1 capitalize">
-              {format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM", { locale: es })} ·{" "}
-              {fmtSlot(time)}
-            </p>
-            <p className="text-sm text-muted">{service?.name}</p>
-            {cartCount > 0 && (
-              <p className="text-xs text-success mt-1">
-                ✓ {cartCount} producto{cartCount > 1 ? "s" : ""} para tu visita
-              </p>
-            )}
+          <h2 className="text-xl font-bold text-foreground">¡Reserva confirmada!</h2>
+        </div>
+
+        {/* Full appointment details */}
+        <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
+          <SummaryRow label="Servicio" value={service?.name ?? ""} />
+          <SummaryRow
+            label="Fecha"
+            value={format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM yyyy", { locale: es })}
+          />
+          <SummaryRow label="Hora" value={fmtSlot(time)} />
+          <SummaryRow label="Duración" value={`${service?.duration_minutes} minutos`} />
+          {cartItems.map(([id, q]) => {
+            const p = products.find((pp) => pp.id === id);
+            if (!p) return null;
+            return (
+              <SummaryRow
+                key={id}
+                label={`${q}× ${p.name}`}
+                value={`$${(Number(p.price) * q).toFixed(2)}`}
+              />
+            );
+          })}
+          <div className="flex items-center justify-between px-4 py-3 gap-3 bg-brand-light">
+            <span className="text-sm font-bold text-foreground">Total (pago en el local)</span>
+            <span className="text-base font-black text-brand">${successTotal.toFixed(2)}</span>
           </div>
         </div>
 
@@ -405,7 +420,16 @@ export function BookingFlow({
         {guestPrompt === "form" && appointmentId && (
           <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
             <p className="font-semibold text-sm text-foreground">Datos del invitado</p>
-            <GuestForm appointmentId={appointmentId} onDone={() => setGuestPrompt("done")} />
+            <GuestForm
+              appointmentId={appointmentId}
+              services={services.map((s) => ({
+                id: s.id,
+                name: s.name,
+                duration_minutes: s.duration_minutes,
+                price: s.price,
+              }))}
+              onDone={() => setGuestPrompt("done")}
+            />
           </div>
         )}
 

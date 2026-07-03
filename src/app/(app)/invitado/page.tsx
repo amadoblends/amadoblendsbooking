@@ -20,14 +20,21 @@ export default async function InvitadoPage() {
 
   if (!client) redirect("/configurar-perfil");
 
-  const { data: upcoming } = await supabase
-    .from("appointments")
-    .select("id, starts_at, services(name)")
-    .eq("client_id", client.id)
-    .gte("starts_at", new Date().toISOString())
-    .neq("status", "cancelada")
-    .order("starts_at", { ascending: true })
-    .limit(10);
+  const [{ data: upcoming }, { data: services }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("id, starts_at, services(name)")
+      .eq("client_id", client.id)
+      .gte("starts_at", new Date().toISOString())
+      .neq("status", "cancelada")
+      .order("starts_at", { ascending: true })
+      .limit(10),
+    supabase
+      .from("services")
+      .select("id, name, duration_minutes, price")
+      .eq("is_public", true)
+      .order("price"),
+  ]);
 
   const appointments = (upcoming ?? []).map((a) => ({
     id: a.id,
@@ -64,7 +71,7 @@ export default async function InvitadoPage() {
           </Link>
         </div>
       ) : (
-        <GuestAdder appointments={appointments} />
+        <GuestAdder appointments={appointments} services={services ?? []} />
       )}
     </div>
   );
