@@ -28,6 +28,7 @@ export default async function ReservarPage({
       supabase
         .from("services")
         .select("id, name, duration_minutes, price, color, image_url, kind")
+        .eq("is_public", true)
         .order("price"),
       supabase.from("availability").select("*").order("weekday"),
       supabase

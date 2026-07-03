@@ -43,6 +43,7 @@ export default async function HomePage() {
       .from("services")
       .select("id, name, duration_minutes, price, color, image_url")
       .eq("kind", "single")
+      .eq("is_public", true)
       .order("price", { ascending: true })
       .limit(4),
   ]);
