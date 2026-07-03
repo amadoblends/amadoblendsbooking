@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronRight, LogOut, Calendar, Scissors } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@/components/profile/sign-out-button";
+import { BackButton } from "@/components/ui/back-button";
 
 export default async function PerfilPage() {
   const supabase = await createClient();
@@ -35,7 +36,8 @@ export default async function PerfilPage() {
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
-      <header>
+      <header className="flex items-center gap-3">
+        <BackButton />
         <h1 className="text-xl font-bold text-foreground">Mi perfil</h1>
       </header>
 

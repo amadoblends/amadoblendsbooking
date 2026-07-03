@@ -1,18 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarPlus, Clock, Scissors, ShoppingBag, UserPlus } from "lucide-react";
+import { Clock, Scissors } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-
-const quickAccess = [
-  { href: "/reservar", label: "Reservar cita", icon: CalendarPlus },
-  { href: "/citas", label: "Mis citas", icon: Clock },
-  { href: "/invitado", label: "Agregar invitado", icon: UserPlus },
-  { href: "/tienda", label: "Productos", icon: ShoppingBag },
-];
+import { QuickAccessGrid } from "@/components/home/quick-access-grid";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -127,19 +121,8 @@ export default async function HomePage() {
         </Link>
       )}
 
-      {/* Quick access */}
-      <div className="grid grid-cols-4 gap-3">
-        {quickAccess.map((item) => (
-          <Link key={item.href} href={item.href} className="flex flex-col items-center gap-2">
-            <div className="w-full aspect-square max-w-[72px] rounded-2xl bg-surface border border-border flex items-center justify-center active:bg-brand-light">
-              <item.icon size={22} className="text-brand" />
-            </div>
-            <span className="text-[10px] font-medium text-muted text-center leading-tight">
-              {item.label}
-            </span>
-          </Link>
-        ))}
-      </div>
+      {/* Quick access — long-press to reorder like iPhone apps */}
+      <QuickAccessGrid />
 
       {/* Popular services */}
       {services && services.length > 0 && (

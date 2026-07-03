@@ -106,3 +106,19 @@ button {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* iPhone-style jiggle while reordering home cards */
+@keyframes wiggle {
+  0% {
+    transform: rotate(-1.7deg);
+  }
+  50% {
+    transform: rotate(1.7deg);
+  }
+  100% {
+    transform: rotate(-1.7deg);
+  }
+}
+.animate-wiggle {
+  animation: wiggle 0.28s ease-in-out infinite;
+}

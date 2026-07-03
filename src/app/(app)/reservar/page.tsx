@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BookingFlow } from "@/components/booking/booking-flow";
+import { BackButton } from "@/components/ui/back-button";
 
 export default async function ReservarPage({
   searchParams,
@@ -54,9 +55,12 @@ export default async function ReservarPage({
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4">
-      <header className="mb-5">
-        <h1 className="text-xl font-bold text-foreground">Reservar cita</h1>
-        <p className="text-sm text-muted">Elige tu servicio y horario</p>
+      <header className="mb-5 flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Reservar cita</h1>
+          <p className="text-sm text-muted">Elige tu servicio y horario</p>
+        </div>
       </header>
 
       <BookingFlow
