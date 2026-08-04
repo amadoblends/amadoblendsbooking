@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -104,6 +104,29 @@ export function GuestBookingFlow({
     if (!dayAvail || !service) return [];
     return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, busy);
   }, [dayAvail, service, date, minNoticeMinutes, busy]);
+
+  const availFor = useCallback(
+    (dateStr: string) => {
+      const wd = new Date(dateStr + "T00:00:00").getDay();
+      return availability.find((d) => d.weekday === wd && d.is_active) ?? null;
+    },
+    [availability]
+  );
+
+  // Remaining openings for the chosen service, shown under each day number
+  const dayCapacity = useCallback(
+    (d: Date): number | null => {
+      if (!service) return null;
+      if (!activeWeekdays.has(d.getDay())) return null;
+      if (isBefore(startOfDay(d), today) || isAfter(startOfDay(d), maxDate)) return null;
+      const ds = format(d, "yyyy-MM-dd");
+      const avail = availFor(ds);
+      if (!avail) return null;
+      return generateSlots(avail, service.duration_minutes, minNoticeMinutes, ds, busy).length;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [service, busy, minNoticeMinutes, availFor]
+  );
 
   async function handleConfirm() {
     if (!service || !time || !relationship) return;
@@ -394,10 +417,12 @@ export function GuestBookingFlow({
               }).map((d) => {
                 const wd = d.getDay();
                 const inMonth = isSameMonth(d, calCursor);
+                const capacity = dayCapacity(d);
                 const disabled =
                   !activeWeekdays.has(wd) ||
                   isBefore(startOfDay(d), today) ||
-                  isAfter(startOfDay(d), maxDate);
+                  isAfter(startOfDay(d), maxDate) ||
+                  capacity === 0;
                 const isSelected = isSameDay(d, new Date(date + "T00:00:00"));
                 const isToday = isSameDay(d, new Date());
 
@@ -412,19 +437,44 @@ export function GuestBookingFlow({
                       }
                     }}
                     className={cn(
-                      "aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-colors",
-                      !inMonth && "text-muted/30",
-                      disabled && "text-muted/25 cursor-not-allowed",
-                      !disabled && inMonth && "text-foreground",
-                      isSelected && "bg-brand text-white font-bold",
-                      !isSelected && isToday && "border border-brand text-brand font-bold"
+                      "aspect-square rounded-xl flex flex-col items-center justify-center transition-colors leading-none gap-0.5",
+                      !inMonth && "opacity-30",
+                      disabled && "cursor-not-allowed",
+                      isSelected && "bg-brand",
+                      !isSelected && isToday && "border border-brand"
                     )}
                   >
-                    {format(d, "d")}
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        disabled ? "text-muted/30" : "text-foreground",
+                        isSelected && "text-white font-bold",
+                        !isSelected && isToday && "text-brand font-bold"
+                      )}
+                    >
+                      {format(d, "d")}
+                    </span>
+                    {capacity !== null && inMonth && (
+                      <span
+                        className={cn(
+                          "text-[9px] font-semibold",
+                          isSelected
+                            ? "text-white/80"
+                            : capacity === 0
+                              ? "text-danger/60"
+                              : "text-success"
+                        )}
+                      >
+                        {capacity}
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
+            <p className="text-[10px] text-muted mt-2 text-center">
+              El número indica los cupos disponibles de cada día.
+            </p>
           </div>
         )}
 
