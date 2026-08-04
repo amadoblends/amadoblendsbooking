@@ -2,18 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, Plus, ShoppingBag, User } from "lucide-react";
+import { Home, Calendar, CalendarPlus, ShoppingBag, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n/language-provider";
+import type { TranslationKey } from "@/lib/i18n";
 
 const items = [
-  { href: "/", label: "Inicio", icon: Home },
-  { href: "/citas", label: "Mis reservas", icon: Calendar },
-  { href: "/tienda", label: "Tienda", icon: ShoppingBag },
-  { href: "/perfil", label: "Mi perfil", icon: User },
+  { href: "/", key: "nav.home" as TranslationKey, icon: Home },
+  { href: "/citas", key: "nav.myBookings" as TranslationKey, icon: Calendar },
+  { href: "/tienda", key: "nav.shop" as TranslationKey, icon: ShoppingBag },
+  { href: "/perfil", key: "nav.profile" as TranslationKey, icon: User },
 ];
 
 export function SideNav() {
   const path = usePathname();
+  const { t } = useT();
 
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col bg-surface border-r border-border p-5 z-20">
@@ -30,7 +33,7 @@ export function SideNav() {
         href="/reservar"
         className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand text-white text-sm font-bold mb-6 shadow-lg shadow-brand/25 active:scale-[0.98] transition-transform"
       >
-        <Plus size={17} /> Reservar cita
+        <CalendarPlus size={17} /> {t("nav.book")}
       </Link>
 
       {/* Nav */}
@@ -49,7 +52,7 @@ export function SideNav() {
               )}
             >
               <item.icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-              {item.label}
+              {t(item.key)}
             </Link>
           );
         })}

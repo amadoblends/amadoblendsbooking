@@ -6,6 +6,7 @@ import { ChevronRight, Calendar, Scissors, Pencil, Globe, Bell, Mail, Phone } fr
 import { BackButton } from "@/components/ui/back-button";
 import { SignOutButton } from "@/components/profile/sign-out-button";
 import { LANGUAGES } from "@/lib/i18n";
+import { getT } from "@/lib/session";
 
 export default async function PerfilPage() {
   const supabase = await createClient();
@@ -40,13 +41,14 @@ export default async function PerfilPage() {
     .toUpperCase();
 
   const lang = LANGUAGES.find((l) => l.code === (client.language ?? "es"));
+  const { t } = await getT();
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <BackButton />
-          <h1 className="text-xl font-bold text-foreground">Mi perfil</h1>
+          <h1 className="text-xl font-bold text-foreground">{t("profile.title")}</h1>
         </div>
         <Link
           href="/perfil/editar"
@@ -82,27 +84,43 @@ export default async function PerfilPage() {
         <div className="bg-surface rounded-2xl border border-border p-4 text-center">
           <Calendar size={20} className="text-brand mx-auto mb-1" />
           <p className="text-2xl font-bold text-foreground">{totalApts ?? 0}</p>
-          <p className="text-xs text-muted">Citas realizadas</p>
+          <p className="text-xs text-muted">{t("profile.appointmentsDone")}</p>
         </div>
         <div className="bg-surface rounded-2xl border border-border p-4 text-center">
           <Scissors size={20} className="text-brand mx-auto mb-1" />
           <p className="text-2xl font-bold text-foreground">Amado</p>
-          <p className="text-xs text-muted">Tu barbero</p>
+          <p className="text-xs text-muted">{t("profile.yourBarber")}</p>
         </div>
       </div>
 
       {/* Menu */}
       <div className="bg-surface rounded-2xl border border-border divide-y divide-border overflow-hidden">
-        <Row href="/perfil/editar" icon={<Pencil size={18} className="text-muted" />} label="Editar perfil" />
+        <Row
+          href="/perfil/editar"
+          icon={<Pencil size={18} className="text-muted" />}
+          label={t("profile.edit")}
+        />
         <Row
           href="/perfil/editar"
           icon={<Globe size={18} className="text-muted" />}
-          label="Idioma"
+          label={t("profile.language")}
           value={`${lang?.flag ?? ""} ${lang?.label ?? "Español"}`}
         />
-        <Row href="/notificaciones" icon={<Bell size={18} className="text-muted" />} label="Notificaciones" />
-        <Row href="/citas" icon={<Calendar size={18} className="text-muted" />} label="Mis citas" />
-        <Row href="/reservar" icon={<Scissors size={18} className="text-muted" />} label="Reservar cita" />
+        <Row
+          href="/notificaciones"
+          icon={<Bell size={18} className="text-muted" />}
+          label={t("common.notifications")}
+        />
+        <Row
+          href="/citas"
+          icon={<Calendar size={18} className="text-muted" />}
+          label={t("nav.myBookings")}
+        />
+        <Row
+          href="/reservar"
+          icon={<Scissors size={18} className="text-muted" />}
+          label={t("nav.book")}
+        />
       </div>
 
       <SignOutButton />

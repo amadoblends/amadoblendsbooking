@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { key: "reservar", href: "/reservar", label: "Reservar cita", icon: CalendarPlus },
   { key: "citas", href: "/citas", label: "Mis citas", icon: Clock },
-  { key: "invitado", href: "/invitado", label: "Agregar invitado", icon: UserPlus },
+  { key: "invitado", href: "/reservar?guest=1", label: "Agregar invitado", icon: UserPlus },
   { key: "tienda", href: "/tienda", label: "Productos", icon: ShoppingBag },
 ] as const;
 

@@ -9,6 +9,7 @@ import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 import { BackButton } from "@/components/ui/back-button";
 import { GroupedHistory, type HistoryAppointment } from "@/components/appointments/grouped-history";
 import { relationshipLabel } from "@/lib/booking";
+import { getT } from "@/lib/session";
 
 export default async function MisCitasPage() {
   const supabase = await createClient();
@@ -26,6 +27,7 @@ export default async function MisCitasPage() {
 
   if (!client) redirect("/configurar-perfil");
 
+  const { t } = await getT();
   const nowISO = new Date().toISOString();
 
   const [{ data: upcoming }, { data: past }] = await Promise.all([
@@ -66,21 +68,23 @@ export default async function MisCitasPage() {
       <RealtimeRefresher tables={["appointments"]} />
       <header className="flex items-center gap-3">
         <BackButton />
-        <h1 className="text-xl font-bold text-foreground">Mis citas</h1>
+        <h1 className="text-xl font-bold text-foreground">{t("appointments.title")}</h1>
       </header>
 
       {/* Upcoming */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">Próximas</h2>
+        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
+          {t("appointments.upcoming")}
+        </h2>
         {!upcoming || upcoming.length === 0 ? (
           <div className="bg-surface rounded-2xl border border-border p-6 text-center space-y-3">
             <Calendar size={32} className="text-muted mx-auto" />
-            <p className="text-sm text-muted">No tienes citas próximas.</p>
+            <p className="text-sm text-muted">{t("appointments.none")}</p>
             <Link
               href="/reservar"
               className="inline-block bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
             >
-              Reservar ahora
+              {t("appointments.bookNow")}
             </Link>
           </div>
         ) : (
@@ -129,7 +133,9 @@ export default async function MisCitasPage() {
 
       {/* History grouped by year → month → day */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">Historial</h2>
+        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
+          {t("appointments.history")}
+        </h2>
         <GroupedHistory appointments={history} />
       </section>
     </div>

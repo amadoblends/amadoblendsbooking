@@ -1,13 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BookingFlow } from "@/components/booking/booking-flow";
-import { BackButton } from "@/components/ui/back-button";
+import { BookingWizard, type WizardServiceProduct } from "@/components/booking/booking-wizard";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function ReservarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ serviceId?: string }>;
+  searchParams: Promise<{ serviceId?: string; guest?: string }>;
 }) {
   const supabase = await createClient();
   const params = await searchParams;
@@ -19,7 +18,7 @@ export default async function ReservarPage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, full_name, first_name")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -65,29 +64,6 @@ export default async function ReservarPage({
         .select("service_id, products(id, name, image_url, category, available_for_services)"),
     ]);
 
-  const serviceProductsByService = new Map<
-    string,
-    { id: string; name: string; image_url: string | null; category: "dry" | "wet" | null }[]
-  >();
-  for (const row of serviceProducts ?? []) {
-    const product = row.products as unknown as {
-      id: string;
-      name: string;
-      image_url: string | null;
-      category: "dry" | "wet" | null;
-      available_for_services: boolean;
-    } | null;
-    if (!product || !product.available_for_services) continue;
-    const list = serviceProductsByService.get(row.service_id) ?? [];
-    list.push({
-      id: product.id,
-      name: product.name,
-      image_url: product.image_url,
-      category: product.category,
-    });
-    serviceProductsByService.set(row.service_id, list);
-  }
-
   const nameById = new Map((allServiceNames ?? []).map((s) => [s.id, s.name]));
   const includesByPackage = new Map<string, string[]>();
   for (const row of packageItems ?? []) {
@@ -98,32 +74,49 @@ export default async function ReservarPage({
     includesByPackage.set(row.package_id, list);
   }
 
-  const servicesWithIncludes = (services ?? []).map((s) => ({
+  const useProductsByService = new Map<string, WizardServiceProduct[]>();
+  for (const row of serviceProducts ?? []) {
+    const product = row.products as unknown as {
+      id: string;
+      name: string;
+      image_url: string | null;
+      category: "dry" | "wet" | null;
+      available_for_services: boolean;
+    } | null;
+    if (!product || !product.available_for_services) continue;
+    const list = useProductsByService.get(row.service_id) ?? [];
+    list.push({
+      id: product.id,
+      name: product.name,
+      image_url: product.image_url,
+      category: product.category,
+    });
+    useProductsByService.set(row.service_id, list);
+  }
+
+  const enriched = (services ?? []).map((s) => ({
     ...s,
     included_names: s.kind === "package" ? (includesByPackage.get(s.id) ?? []) : [],
-    service_products: serviceProductsByService.get(s.id) ?? [],
+    service_products: useProductsByService.get(s.id) ?? [],
   }));
 
-  return (
-    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4">
-      <RealtimeRefresher tables={["services", "promotions", "products", "service_products"]} />
-      <header className="mb-5 flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Reservar cita</h1>
-          <p className="text-sm text-muted">Elige tu servicio y horario</p>
-        </div>
-      </header>
+  const ownerName = client.first_name ?? client.full_name.split(" ")[0];
 
-      <BookingFlow
+  return (
+    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-6">
+      <RealtimeRefresher tables={["services", "promotions", "products", "service_products"]} />
+
+      <BookingWizard
         clientId={client.id}
-        services={servicesWithIncludes}
+        ownerName={ownerName}
+        services={enriched}
         products={products ?? []}
         availability={availability ?? []}
         promotions={promotions ?? []}
         bookingWindowDays={settings?.booking_window_days ?? 30}
         minNoticeMinutes={settings?.min_notice_minutes ?? 60}
         preselectedServiceId={params.serviceId}
+        startAsGuest={params.guest === "1"}
       />
     </div>
   );

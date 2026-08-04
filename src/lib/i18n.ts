@@ -43,12 +43,74 @@ const dict = {
   "booking.combos": { es: "Combos", en: "Combos" },
   "booking.selectTime": { es: "Selecciona una hora", en: "Select a time" },
   "booking.continue": { es: "Continuar", en: "Continue" },
+  "booking.skip": { es: "Continuar sin agregar", en: "Continue without adding" },
   "booking.confirm": { es: "Confirmar cita", en: "Confirm appointment" },
   "booking.confirmed": { es: "¡Reserva confirmada!", en: "Booking confirmed!" },
-  "booking.summary": { es: "Resumen de tu reserva", en: "Your booking summary" },
+  "booking.summary": { es: "Revisa tu reserva", en: "Review your booking" },
   "booking.total": { es: "Total", en: "Total" },
   "booking.payAtShop": { es: "En el local", en: "At the shop" },
+  "booking.payment": { es: "Método de pago", en: "Payment method" },
   "booking.minutes": { es: "minutos", en: "minutes" },
+  "booking.duration": { es: "Duración", en: "Duration" },
+  "booking.date": { es: "Fecha", en: "Date" },
+  "booking.time": { es: "Hora", en: "Time" },
+  "booking.service": { es: "Servicio", en: "Service" },
+  "booking.discount": { es: "Descuento", en: "Discount" },
+  "booking.forWho": { es: "¿Para quién es la cita?", en: "Who is this appointment for?" },
+  "booking.forWhoHint": {
+    es: "Puedes reservar para ti o para alguien más.",
+    en: "You can book for yourself or for someone else.",
+  },
+  "booking.forWhom": { es: "Para", en: "For" },
+  "booking.forMe": { es: "Para mí", en: "For me" },
+  "booking.forGuest": { es: "Para un invitado", en: "For a guest" },
+  "booking.forGuestHint": {
+    es: "Amigo, familiar o pareja",
+    en: "Friend, family or partner",
+  },
+  "booking.pickService": { es: "Elige tu servicio", en: "Choose your service" },
+  "booking.extras": { es: "¿Quieres llevar algo?", en: "Want to take something home?" },
+  "booking.extrasHint": {
+    es: "Productos que puedes comprar en tu visita. Opcional.",
+    en: "Products you can buy during your visit. Optional.",
+  },
+  "booking.pickDate": { es: "Elige el día", en: "Pick a day" },
+  "booking.capacityHint": {
+    es: "El número indica los cupos disponibles.",
+    en: "The number shows the openings left.",
+  },
+  "booking.productsToUse": { es: "Productos a usar", en: "Products to use" },
+  "booking.heldFor": { es: "Tu horario está reservado por", en: "Your slot is held for" },
+  "booking.holdExpired": {
+    es: "Tu reserva temporal expiró. Elige una hora de nuevo.",
+    en: "Your temporary hold expired. Please pick a time again.",
+  },
+  "booking.slotTaken": {
+    es: "Ese horario acaba de ocuparse. Elige otro.",
+    en: "That slot was just taken. Please choose another.",
+  },
+  "booking.createFailed": {
+    es: "No se pudo crear la cita. Intenta de nuevo.",
+    en: "Could not create the appointment. Please try again.",
+  },
+  "booking.noSchedule": {
+    es: "No hay horario para este día.",
+    en: "No schedule for this day.",
+  },
+  "booking.noSlots": {
+    es: "Sin horarios disponibles. Prueba otra fecha.",
+    en: "No times available. Try another date.",
+  },
+  "booking.anotherBooking": { es: "Otra cita", en: "Another booking" },
+
+  // Breadcrumb
+  "booking.crumbWho": { es: "Para quién", en: "For who" },
+  "booking.crumbService": { es: "Servicio", en: "Service" },
+  "booking.crumbExtras": { es: "Extras", en: "Extras" },
+  "booking.crumbProducts": { es: "Productos", en: "Products" },
+  "booking.crumbDate": { es: "Fecha", en: "Date" },
+  "booking.crumbTime": { es: "Hora", en: "Time" },
+  "booking.crumbConfirm": { es: "Confirmar", en: "Confirm" },
 
   // Products during service
   "products.question": {
@@ -61,6 +123,7 @@ const dict = {
   },
   "products.dry": { es: "Secos", en: "Dry" },
   "products.wet": { es: "Húmedos", en: "Wet" },
+  "products.other": { es: "Otros", en: "Other" },
   "products.none": {
     es: "Este servicio no tiene productos asociados.",
     en: "This service has no products linked.",

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { translate, type Language, type TranslationKey } from "@/lib/i18n";
 
 export const INACTIVITY_DAYS = 30;
 const TOUCH_AFTER_MINUTES = 60;
@@ -8,8 +9,31 @@ export interface SessionClient {
   full_name: string;
   first_name: string | null;
   last_name: string | null;
-  language: "es" | "en";
+  language: Language;
   avatar_url: string | null;
+}
+
+/** Translator for server components: `const { t, lang } = await getT()`. */
+export async function getT(): Promise<{
+  t: (key: TranslationKey) => string;
+  lang: Language;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let lang: Language = "es";
+  if (user) {
+    const { data } = await supabase
+      .from("clients")
+      .select("language")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data?.language === "en") lang = "en";
+  }
+
+  return { lang, t: (key: TranslationKey) => translate(key, lang) };
 }
 
 /**

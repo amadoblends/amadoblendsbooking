@@ -35,6 +35,7 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [switchingLang, setSwitchingLang] = useState(false);
 
   // Photo and language are low-risk; identity fields need a code
   const sensitiveChanged =
@@ -44,6 +45,19 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
     email !== profile.email;
 
   const anyChange = sensitiveChanged || avatarUrl !== profile.avatarUrl || language !== profile.language;
+
+  // Language is applied app-wide, so switch it right away with a short
+  // loading state instead of waiting for the rest of the form to be saved
+  async function applyLanguage(next: Language) {
+    if (next === language) return;
+    setLanguage(next);
+    setSwitchingLang(true);
+    const supabase = createClient();
+    await supabase.from("clients").update({ language: next }).eq("id", profile.id);
+    router.refresh();
+    // Give the refreshed server components a beat to swap in
+    setTimeout(() => setSwitchingLang(false), 600);
+  }
 
   async function persist() {
     const supabase = createClient();
@@ -244,19 +258,27 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
             <button
               key={l.code}
               type="button"
-              onClick={() => setLanguage(l.code)}
+              disabled={switchingLang}
+              onClick={() => applyLanguage(l.code)}
               className={cn(
-                "h-11 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors",
+                "h-11 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60",
                 language === l.code
                   ? "bg-brand border-brand text-white"
                   : "border-border bg-background text-foreground"
               )}
             >
-              <span>{l.flag}</span>
+              {switchingLang && language === l.code ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <span>{l.flag}</span>
+              )}
               {l.label}
             </button>
           ))}
         </div>
+        {switchingLang && (
+          <p className="text-xs text-muted text-center">Aplicando idioma / Applying language...</p>
+        )}
       </div>
 
       {sensitiveChanged && (

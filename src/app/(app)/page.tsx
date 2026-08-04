@@ -7,7 +7,9 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { QuickAccessGrid } from "@/components/home/quick-access-grid";
+import { HeroCarousel } from "@/components/home/hero-carousel";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
+import { getT } from "@/lib/session";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -25,7 +27,7 @@ export default async function HomePage() {
 
   if (!client) redirect("/configurar-perfil");
 
-  const [{ data: nextApt }, { data: services }] = await Promise.all([
+  const [{ data: nextApt }, { data: services }, { data: carouselPosts }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, starts_at, status, services(name)")
@@ -42,13 +44,19 @@ export default async function HomePage() {
       .eq("is_public", true)
       .order("price", { ascending: true })
       .limit(4),
+    // RLS already filters to posts that are active and within their dates
+    supabase
+      .from("carousel_posts")
+      .select("id, title, description, image_url, type, button_label, button_href")
+      .order("sort_order"),
   ]);
 
   const firstName = client.full_name.split(" ")[0];
+  const { t, lang } = await getT();
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-6">
-      <RealtimeRefresher tables={["services", "appointments"]} />
+      <RealtimeRefresher tables={["services", "appointments", "carousel_posts"]} />
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -64,39 +72,14 @@ export default async function HomePage() {
 
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">¡Hola, {firstName}! 👋</h1>
-        <p className="text-sm text-muted mt-0.5">¿Listo para tu próximo corte?</p>
+        <h1 className="text-2xl font-bold text-foreground">
+          {t("home.greeting")}, {firstName}! 👋
+        </h1>
+        <p className="text-sm text-muted mt-0.5">{t("home.subtitle")}</p>
       </div>
 
-      {/* Hero banner — drop /public/images/hero.jpg to replace the gradient */}
-      <Link
-        href="/reservar"
-        className="block relative overflow-hidden rounded-3xl border border-border"
-        style={{
-          backgroundImage:
-            "linear-gradient(100deg, rgba(11,11,13,0.95) 5%, rgba(11,11,13,0.6) 50%, rgba(255,106,61,0.35) 130%), url('/images/hero.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center right",
-        }}
-      >
-        <div className="p-6 pr-28 min-h-[168px] flex flex-col justify-center">
-          <p className="text-[26px] leading-[1.1] font-black text-foreground uppercase">
-            Tu mejor
-            <br />
-            versión
-          </p>
-          <p className="text-[26px] leading-[1.1] font-black text-brand uppercase">
-            comienza aquí
-          </p>
-          <span className="mt-4 inline-flex self-start bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl">
-            Reservar cita
-          </span>
-        </div>
-        <Scissors
-          size={90}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 text-brand/15 rotate-[-20deg]"
-        />
-      </Link>
+      {/* Promotions, closures and announcements managed from the admin panel */}
+      <HeroCarousel posts={carouselPosts ?? []} lang={lang} />
 
       {/* Next appointment strip */}
       {nextApt && (
@@ -109,7 +92,7 @@ export default async function HomePage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-brand uppercase tracking-wide">
-              Próxima cita
+              {t("home.nextAppointment")}
             </p>
             <p className="text-sm font-semibold text-foreground capitalize truncate">
               {format(new Date(nextApt.starts_at), "EEE d MMM", { locale: es })} ·{" "}
@@ -130,9 +113,9 @@ export default async function HomePage() {
       {services && services.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-foreground">Servicios populares</h2>
+            <h2 className="font-bold text-foreground">{t("home.popularServices")}</h2>
             <Link href="/reservar" className="text-sm text-brand font-semibold">
-              Ver todos
+              {t("home.seeAll")}
             </Link>
           </div>
           <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">

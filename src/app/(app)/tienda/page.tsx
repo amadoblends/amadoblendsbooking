@@ -4,6 +4,7 @@ import { ShoppingBag, Package } from "lucide-react";
 import Image from "next/image";
 import { BackButton } from "@/components/ui/back-button";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
+import { getT } from "@/lib/session";
 
 export default async function TiendaPage() {
   const supabase = await createClient();
@@ -13,6 +14,7 @@ export default async function TiendaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { t } = await getT();
   const { data: products } = await supabase
     .from("products")
     .select("id, name, price, stock, image_url")
@@ -26,15 +28,15 @@ export default async function TiendaPage() {
       <header className="flex items-center gap-3">
         <BackButton />
         <div>
-          <h1 className="text-xl font-bold text-foreground">Tienda</h1>
-          <p className="text-sm text-muted">Productos profesionales para tu mejor versión</p>
+          <h1 className="text-xl font-bold text-foreground">{t("shop.title")}</h1>
+          <p className="text-sm text-muted">{t("shop.subtitle")}</p>
         </div>
       </header>
 
       {!products || products.length === 0 ? (
         <div className="bg-surface rounded-2xl border border-border p-8 text-center space-y-2">
           <Package size={32} className="text-muted mx-auto" />
-          <p className="text-sm text-muted">Pronto tendremos productos disponibles.</p>
+          <p className="text-sm text-muted">{t("shop.empty")}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
