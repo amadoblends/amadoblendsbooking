@@ -61,7 +61,7 @@ export interface WizardPromotion {
   ends_on: string | null;
 }
 
-type Step = "forWho" | "service" | "extras" | "useProducts" | "date" | "time" | "summary";
+type Step = "service" | "forWho" | "extras" | "useProducts" | "date" | "time" | "summary";
 
 const HOLD_SECONDS = 60;
 
@@ -125,7 +125,8 @@ export function BookingWizard({
     : null;
 
   // ── State ────────────────────────────────────────────────────────────────
-  const [step, setStep] = useState<Step>(startAsGuest ? "forWho" : "forWho");
+  // A service picked from the home screen skips straight past that step
+  const [step, setStep] = useState<Step>(initService ? "forWho" : "service");
   const [forGuest, setForGuest] = useState(startAsGuest);
   const [relationship, setRelationship] = useState<GuestRelationship | null>(null);
   const [guestName, setGuestName] = useState("");
@@ -168,7 +169,7 @@ export function BookingWizard({
 
   // Steps that actually apply to this booking
   const steps = useMemo<Step[]>(() => {
-    const list: Step[] = ["forWho", "service"];
+    const list: Step[] = ["service", "forWho"];
     if (products.length > 0) list.push("extras");
     if (availableUseProducts.length > 0) list.push("useProducts");
     list.push("date", "time", "summary");
@@ -176,17 +177,28 @@ export function BookingWizard({
   }, [products.length, availableUseProducts.length]);
 
   const stepIndex = steps.indexOf(step);
+  // Highest step the user has actually completed — they can revisit any of
+  // these from the breadcrumb but can't jump ahead into unfilled ones
+  const [maxReached, setMaxReached] = useState(initService ? 1 : 0);
+
+  function goTo(target: Step) {
+    const idx = steps.indexOf(target);
+    if (idx === -1 || idx > maxReached) return;
+    // Leaving the held slot frees it for everyone else
+    if ((step === "time" || step === "summary") && idx < steps.indexOf("time")) releaseHold();
+    setStep(target);
+  }
 
   function goNext() {
     const next = steps[stepIndex + 1];
-    if (next) setStep(next);
+    if (!next) return;
+    setMaxReached((m) => Math.max(m, stepIndex + 1));
+    setStep(next);
   }
+
   function goBack() {
     const prev = steps[stepIndex - 1];
-    if (prev) {
-      if (step === "time" || step === "summary") releaseHold();
-      setStep(prev);
-    }
+    if (prev) goTo(prev);
   }
 
   // ── Availability ─────────────────────────────────────────────────────────
@@ -405,13 +417,13 @@ export function BookingWizard({
         <div className="flex gap-3">
           <button
             onClick={restart}
-            className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-foreground"
+            className="flex-1 h-13 rounded-2xl border border-border text-base font-semibold text-foreground"
           >
             {t("booking.anotherBooking")}
           </button>
           <button
             onClick={() => router.push("/citas")}
-            className="flex-1 h-11 rounded-xl bg-brand text-white text-sm font-semibold"
+            className="flex-1 h-13 rounded-2xl bg-brand text-white text-base font-bold"
           >
             {t("nav.myBookings")}
           </button>
@@ -422,12 +434,21 @@ export function BookingWizard({
 
   // ── Shell with breadcrumb ────────────────────────────────────────────────
   return (
-    <div className="space-y-5">
-      <Breadcrumb steps={steps} current={stepIndex} t={t} />
+    <div className="space-y-6">
+      <Breadcrumb
+        steps={steps}
+        current={stepIndex}
+        maxReached={maxReached}
+        onGo={goTo}
+        t={t}
+      />
 
       {stepIndex > 0 && (
-        <button onClick={goBack} className="flex items-center gap-1.5 text-sm text-muted">
-          <ChevronLeft size={16} /> {t("common.back")}
+        <button
+          onClick={goBack}
+          className="flex items-center gap-1.5 text-[15px] font-medium text-muted h-9 -my-1"
+        >
+          <ChevronLeft size={18} /> {t("common.back")}
         </button>
       )}
 
@@ -482,7 +503,7 @@ export function BookingWizard({
                     key={r.value}
                     onClick={() => setRelationship(r.value)}
                     className={cn(
-                      "h-12 rounded-xl border text-[11px] font-semibold px-1 transition-colors",
+                      "h-14 rounded-xl border text-xs font-semibold px-1 transition-colors",
                       relationship === r.value
                         ? "bg-brand border-brand text-white"
                         : "border-border bg-background text-foreground"
@@ -498,13 +519,13 @@ export function BookingWizard({
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
                 placeholder={t("guest.name")}
-                className="w-full h-12 px-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
+                className="w-full h-14 px-4 rounded-2xl border border-border bg-background text-base text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
               />
 
               <button
                 disabled={!relationship || guestName.trim().length < 2}
                 onClick={goNext}
-                className="w-full h-11 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-40"
+                className="w-full h-13 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-40"
               >
                 {t("booking.continue")} →
               </button>
@@ -524,7 +545,7 @@ export function BookingWizard({
                 key={k}
                 onClick={() => setTab(k)}
                 className={cn(
-                  "flex-1 h-9 rounded-lg text-sm font-semibold transition-colors",
+                  "flex-1 h-11 rounded-xl text-[15px] font-semibold transition-colors",
                   tab === k ? "bg-brand text-white" : "text-muted"
                 )}
               >
@@ -546,19 +567,19 @@ export function BookingWizard({
                     goNext();
                   }}
                   className={cn(
-                    "w-full flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+                    "w-full flex items-start gap-3.5 rounded-2xl border p-4 text-left transition-colors",
                     isCombo
                       ? "bg-gradient-to-br from-surface to-brand-light border-brand/40"
                       : "bg-surface border-border active:bg-background"
                   )}
                 >
                   {s.image_url ? (
-                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
                       <Image src={s.image_url} alt={s.name} width={56} height={56} className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div
-                      className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center"
+                      className="w-16 h-16 rounded-2xl shrink-0 flex items-center justify-center"
                       style={{ background: `${s.color}26` }}
                     >
                       {isCombo ? (
@@ -570,7 +591,7 @@ export function BookingWizard({
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="font-semibold text-sm text-foreground">{s.name}</p>
+                      <p className="font-bold text-base text-foreground">{s.name}</p>
                       {isCombo && (
                         <span className="text-[9px] font-black tracking-wide text-white bg-brand px-1.5 py-0.5 rounded-full uppercase">
                           Combo
@@ -586,7 +607,7 @@ export function BookingWizard({
                     )}
                     <p className="text-xs text-muted mt-0.5">⏱ {s.duration_minutes} min</p>
                   </div>
-                  <p className="text-base font-bold text-brand shrink-0">${s.price}</p>
+                  <p className="text-lg font-black text-brand shrink-0">${s.price}</p>
                 </button>
               );
             })}
@@ -643,7 +664,7 @@ export function BookingWizard({
 
           <button
             onClick={goNext}
-            className="w-full h-12 rounded-xl bg-brand text-white font-semibold"
+            className="w-full h-14 rounded-2xl bg-brand text-white font-bold text-base"
           >
             {cartCount > 0
               ? `${t("booking.continue")} · $${cartTotal.toFixed(2)}`
@@ -701,7 +722,7 @@ export function BookingWizard({
 
           <button
             onClick={goNext}
-            className="w-full h-12 rounded-xl bg-brand text-white font-semibold"
+            className="w-full h-14 rounded-2xl bg-brand text-white font-bold text-base"
           >
             {chosenProducts.size > 0 ? `${t("booking.continue")} (${chosenProducts.size})` : t("booking.skip")}
           </button>
@@ -734,7 +755,7 @@ export function BookingWizard({
 
             <div className="grid grid-cols-7 gap-0.5 mb-1">
               {WEEK_LABELS.map((w, i) => (
-                <div key={i} className="text-center text-[10px] font-semibold text-muted py-1">
+                <div key={i} className="text-center text-[11px] font-bold text-muted py-1.5">
                   {w}
                 </div>
               ))}
@@ -765,7 +786,7 @@ export function BookingWizard({
                       goNext();
                     }}
                     className={cn(
-                      "aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 leading-none transition-colors",
+                      "aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 leading-none transition-colors min-h-[46px]",
                       !inMonth && "opacity-30",
                       disabled && "cursor-not-allowed",
                       isSelected && "bg-brand",
@@ -785,7 +806,7 @@ export function BookingWizard({
                     {capacity !== null && inMonth && (
                       <span
                         className={cn(
-                          "text-[9px] font-semibold",
+                          "text-[10px] font-bold",
                           isSelected ? "text-white/80" : capacity === 0 ? "text-danger/60" : "text-success"
                         )}
                       >
@@ -827,12 +848,12 @@ export function BookingWizard({
               {t("booking.noSlots")}
             </p>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
               {slots.map((s) => (
                 <button
                   key={s}
                   onClick={() => pickTime(s)}
-                  className="h-12 rounded-xl text-sm font-semibold border border-border text-foreground bg-surface active:bg-brand active:text-white active:border-brand transition-colors"
+                  className="h-14 rounded-2xl text-base font-semibold border border-border text-foreground bg-surface active:bg-brand active:text-white active:border-brand transition-colors"
                 >
                   {fmtSlot(s)}
                 </button>
@@ -917,7 +938,7 @@ export function BookingWizard({
           <button
             disabled={loading}
             onClick={confirm}
-            className="w-full h-12 rounded-xl bg-brand text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full h-14 rounded-2xl bg-brand text-white font-bold text-base disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
             {loading ? t("common.saving") : t("booking.confirm")}
@@ -933,15 +954,19 @@ export function BookingWizard({
 function Breadcrumb({
   steps,
   current,
+  maxReached,
+  onGo,
   t,
 }: {
   steps: Step[];
   current: number;
+  maxReached: number;
+  onGo: (s: Step) => void;
   t: (k: never) => string;
 }) {
   const LABELS: Record<Step, string> = {
-    forWho: "booking.crumbWho",
     service: "booking.crumbService",
+    forWho: "booking.crumbWho",
     extras: "booking.crumbExtras",
     useProducts: "booking.crumbProducts",
     date: "booking.crumbDate",
@@ -950,24 +975,31 @@ function Breadcrumb({
   };
 
   return (
-    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-4 px-4 py-1">
-      {steps.map((s, i) => (
-        <div key={s} className="flex items-center gap-1 shrink-0">
-          {i > 0 && <ChevronRight size={12} className="text-muted/50 shrink-0" />}
-          <span
-            className={cn(
-              "text-xs font-semibold whitespace-nowrap transition-colors",
-              i === current
-                ? "text-brand"
-                : i < current
-                  ? "text-foreground"
-                  : "text-muted/50"
-            )}
-          >
-            {t(LABELS[s] as never)}
-          </span>
-        </div>
-      ))}
+    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-5 px-5 py-1">
+      {steps.map((s, i) => {
+        const reachable = i <= maxReached;
+        const isCurrent = i === current;
+        return (
+          <div key={s} className="flex items-center gap-1.5 shrink-0">
+            {i > 0 && <ChevronRight size={13} className="text-muted/40 shrink-0" />}
+            <button
+              onClick={() => reachable && onGo(s)}
+              disabled={!reachable}
+              className={cn(
+                "flex items-center gap-1.5 h-9 px-3 rounded-full text-sm font-semibold whitespace-nowrap transition-colors",
+                isCurrent
+                  ? "bg-brand text-white"
+                  : reachable
+                    ? "bg-surface text-foreground active:bg-brand-light"
+                    : "text-muted/40 cursor-not-allowed"
+              )}
+            >
+              {i < current && <Check size={12} className="shrink-0" />}
+              {t(LABELS[s] as never)}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -975,8 +1007,8 @@ function Breadcrumb({
 function StepTitle({ title, hint }: { title: string; hint?: string }) {
   return (
     <div>
-      <h2 className="text-lg font-bold text-foreground leading-tight">{title}</h2>
-      {hint && <p className="text-sm text-muted mt-0.5 capitalize">{hint}</p>}
+      <h2 className="text-xl font-bold text-foreground leading-snug">{title}</h2>
+      {hint && <p className="text-[15px] text-muted mt-1 capitalize">{hint}</p>}
     </div>
   );
 }
@@ -1041,9 +1073,9 @@ function ProductGroup({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 gap-3">
-      <span className="text-sm text-muted shrink-0">{label}</span>
-      <span className="text-sm font-semibold text-foreground text-right truncate capitalize">
+    <div className="flex items-center justify-between px-4 py-3.5 gap-3">
+      <span className="text-[15px] text-muted shrink-0">{label}</span>
+      <span className="text-[15px] font-semibold text-foreground text-right truncate capitalize">
         {value}
       </span>
     </div>

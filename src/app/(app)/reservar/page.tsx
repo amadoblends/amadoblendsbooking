@@ -103,7 +103,7 @@ export default async function ReservarPage({
   const ownerName = client.first_name ?? client.full_name.split(" ")[0];
 
   return (
-    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-6">
+    <div className="px-5 pt-[max(20px,var(--safe-top))] pb-[max(28px,var(--safe-bottom))]">
       <RealtimeRefresher tables={["services", "promotions", "products", "service_products"]} />
 
       <BookingWizard
