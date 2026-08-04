@@ -17,6 +17,7 @@ export default async function TiendaPage() {
     .from("products")
     .select("id, name, price, stock, image_url")
     .gt("stock", 0)
+    .eq("is_visible_for_sale", true)
     .order("name");
 
   return (

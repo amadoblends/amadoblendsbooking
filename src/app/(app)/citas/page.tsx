@@ -2,11 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 import { BackButton } from "@/components/ui/back-button";
+import { GroupedHistory, type HistoryAppointment } from "@/components/appointments/grouped-history";
+import { relationshipLabel } from "@/lib/booking";
 
 export default async function MisCitasPage() {
   const supabase = await createClient();
@@ -24,21 +26,40 @@ export default async function MisCitasPage() {
 
   if (!client) redirect("/configurar-perfil");
 
-  const { data: upcoming } = await supabase
-    .from("appointments")
-    .select("id, starts_at, ends_at, status, price, services(name, color, duration_minutes)")
-    .eq("client_id", client.id)
-    .gte("starts_at", new Date().toISOString())
-    .neq("status", "cancelada")
-    .order("starts_at", { ascending: true });
+  const nowISO = new Date().toISOString();
 
-  const { data: past } = await supabase
-    .from("appointments")
-    .select("id, starts_at, status, price, services(name, color)")
-    .eq("client_id", client.id)
-    .lt("starts_at", new Date().toISOString())
-    .order("starts_at", { ascending: false })
-    .limit(20);
+  const [{ data: upcoming }, { data: past }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select(
+        "id, starts_at, ends_at, status, price, guest_name, guest_relationship, services(name, color, duration_minutes)"
+      )
+      .eq("client_id", client.id)
+      .gte("starts_at", nowISO)
+      .neq("status", "cancelada")
+      .order("starts_at", { ascending: true }),
+    supabase
+      .from("appointments")
+      .select("id, starts_at, status, price, guest_name, guest_relationship, services(name, color)")
+      .eq("client_id", client.id)
+      .lt("starts_at", nowISO)
+      .order("starts_at", { ascending: false })
+      .limit(400),
+  ]);
+
+  const history: HistoryAppointment[] = (past ?? []).map((a) => {
+    const svc = a.services as unknown as { name: string; color: string } | null;
+    return {
+      id: a.id,
+      starts_at: a.starts_at,
+      status: a.status,
+      price: Number(a.price),
+      serviceName: svc?.name ?? "Servicio",
+      serviceColor: svc?.color ?? "#999999",
+      guestName: a.guest_name,
+      guestRelationship: a.guest_relationship,
+    };
+  });
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
@@ -65,7 +86,11 @@ export default async function MisCitasPage() {
         ) : (
           <div className="space-y-2">
             {upcoming.map((a) => {
-              const svc = a.services as unknown as { name: string; color: string; duration_minutes: number };
+              const svc = a.services as unknown as {
+                name: string;
+                color: string;
+                duration_minutes: number;
+              };
               return (
                 <Link
                   key={a.id}
@@ -87,6 +112,12 @@ export default async function MisCitasPage() {
                         minute: "2-digit",
                       })}
                     </p>
+                    {a.guest_name && (
+                      <p className="text-xs text-brand font-semibold flex items-center gap-1 mt-0.5">
+                        <UserPlus size={10} />
+                        {a.guest_name} ({relationshipLabel(a.guest_relationship)})
+                      </p>
+                    )}
                   </div>
                   <StatusBadge status={a.status} />
                 </Link>
@@ -96,36 +127,11 @@ export default async function MisCitasPage() {
         )}
       </section>
 
-      {/* Past */}
-      {past && past.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">Historial</h2>
-          <div className="bg-surface rounded-2xl border border-border divide-y divide-border overflow-hidden">
-            {past.map((a) => {
-              const svc = a.services as unknown as { name: string; color: string };
-              return (
-                <Link
-                  key={a.id}
-                  href={`/citas/${a.id}`}
-                  className="flex items-center gap-3 px-4 py-3 active:bg-background"
-                >
-                  <div
-                    className="w-2 self-stretch rounded-full shrink-0"
-                    style={{ background: svc.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{svc.name}</p>
-                    <p className="text-xs text-muted capitalize">
-                      {format(new Date(a.starts_at), "d MMM yyyy", { locale: es })}
-                    </p>
-                  </div>
-                  <StatusBadge status={a.status} />
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      {/* History grouped by year → month → day */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">Historial</h2>
+        <GroupedHistory appointments={history} />
+      </section>
     </div>
   );
 }

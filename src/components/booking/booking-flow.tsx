@@ -10,12 +10,11 @@ import {
 import { es } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Check, Loader2, Scissors, Sparkles,
-  CalendarDays, Timer, ShoppingBag, Minus, Plus, UserPlus,
+  CalendarDays, Timer, ShoppingBag, Minus, Plus, UserPlus, Wind, Droplet,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowser } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { GuestForm } from "./guest-form";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -29,6 +28,14 @@ interface Service {
   kind: "single" | "package";
   description?: string | null;
   included_names?: string[];
+  service_products?: ServiceProduct[];
+}
+
+interface ServiceProduct {
+  id: string;
+  name: string;
+  image_url: string | null;
+  category: "dry" | "wet" | null;
 }
 
 interface Promotion {
@@ -114,7 +121,7 @@ function generateSlots(
   return out;
 }
 
-type Step = "service" | "products" | "datetime" | "confirm" | "success";
+type Step = "service" | "serviceProducts" | "products" | "datetime" | "confirm" | "success";
 type Tab = "single" | "package";
 
 // Best applicable discount % for a service at a given date + time (0 if none)
@@ -172,7 +179,12 @@ export function BookingFlow({
     ? (services.find((s) => s.id === preselectedServiceId) ?? null)
     : null;
 
-  const [step, setStep] = useState<Step>(initService ? "products" : "service");
+  const firstStepAfterService = (s: Service | null): Step =>
+    s && (s.service_products?.length ?? 0) > 0 ? "serviceProducts" : "products";
+
+  const [step, setStep] = useState<Step>(
+    initService ? firstStepAfterService(initService) : "service"
+  );
   const [tab, setTab] = useState<Tab>("single");
   const [service, setService] = useState<Service | null>(initService);
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -189,8 +201,8 @@ export function BookingFlow({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
-  // Success step: guest flow
-  const [guestPrompt, setGuestPrompt] = useState<"ask" | "form" | "done" | "skipped">("ask");
+  // Products the client wants used during the visit (not for purchase)
+  const [chosenServiceProducts, setChosenServiceProducts] = useState<Set<string>>(new Set());
 
   const holdActive = holdExpiresAt !== null;
 
@@ -372,7 +384,7 @@ export function BookingFlow({
       return;
     }
 
-    // Attach requested products
+    // Products to buy at the shop
     if (cartItems.length > 0) {
       await supabase.from("appointment_products").insert(
         cartItems.map(([productId, quantity]) => ({
@@ -383,9 +395,18 @@ export function BookingFlow({
       );
     }
 
+    // Products the barber should use during the service
+    if (chosenServiceProducts.size > 0) {
+      await supabase.from("appointment_service_products").insert(
+        [...chosenServiceProducts].map((productId) => ({
+          appointment_id: inserted.id,
+          product_id: productId,
+        }))
+      );
+    }
+
     setAppointmentId(inserted.id);
     releaseHolds();
-    setGuestPrompt("ask");
     setStep("success");
     setLoading(false);
   }
@@ -397,7 +418,7 @@ export function BookingFlow({
     setDayChosen(false);
     setAppointmentId(null);
     setCart({});
-    setGuestPrompt("ask");
+    setChosenServiceProducts(new Set());
   }
 
   // ── Render: success ────────────────────────────────────────────────────────
@@ -447,72 +468,28 @@ export function BookingFlow({
           </div>
         </div>
 
-        {/* Guest prompt — first thing after booking */}
-        {guestPrompt === "ask" && appointmentId && (
-          <div className="bg-surface rounded-2xl border border-border p-4 space-y-3 text-center">
-            <div className="w-11 h-11 rounded-full bg-brand-light flex items-center justify-center mx-auto">
-              <UserPlus size={20} className="text-brand" />
-            </div>
-            <p className="font-semibold text-sm text-foreground">
-              ¿Deseas agregar un amigo o invitado a esta cita?
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setGuestPrompt("skipped")}
-                className="flex-1 h-10 rounded-xl border border-border text-sm font-semibold text-muted"
-              >
-                No, gracias
-              </button>
-              <button
-                onClick={() => setGuestPrompt("form")}
-                className="flex-1 h-10 rounded-xl bg-brand text-white text-sm font-semibold"
-              >
-                Sí, agregar
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Bring someone along — creates a separate appointment on this account */}
+        <button
+          onClick={() => router.push("/invitado")}
+          className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-brand-light border border-brand/30 text-brand font-bold text-sm active:bg-brand/15"
+        >
+          <UserPlus size={17} /> Agregar invitado
+        </button>
 
-        {guestPrompt === "form" && appointmentId && (
-          <div className="bg-surface rounded-2xl border border-border p-4 space-y-3">
-            <p className="font-semibold text-sm text-foreground">Datos del invitado</p>
-            <GuestForm
-              appointmentId={appointmentId}
-              services={services.map((s) => ({
-                id: s.id,
-                name: s.name,
-                duration_minutes: s.duration_minutes,
-                price: s.price,
-              }))}
-              onDone={() => setGuestPrompt("done")}
-            />
-          </div>
-        )}
-
-        {guestPrompt === "done" && (
-          <div className="bg-success-light rounded-xl p-3 border border-success/20 text-center">
-            <p className="text-xs text-success font-semibold">
-              ✓ Invitado agregado. Te esperamos a los dos.
-            </p>
-          </div>
-        )}
-
-        {(guestPrompt === "done" || guestPrompt === "skipped") && (
-          <div className="flex gap-3">
-            <button
-              onClick={resetAll}
-              className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-foreground"
-            >
-              Otra cita
-            </button>
-            <button
-              onClick={() => router.push("/citas")}
-              className="flex-1 h-11 rounded-xl bg-brand text-white text-sm font-semibold"
-            >
-              Mis reservas
-            </button>
-          </div>
-        )}
+        <div className="flex gap-3">
+          <button
+            onClick={resetAll}
+            className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-foreground"
+          >
+            Otra cita
+          </button>
+          <button
+            onClick={() => router.push("/citas")}
+            className="flex-1 h-11 rounded-xl bg-brand text-white text-sm font-semibold"
+          >
+            Mis reservas
+          </button>
+        </div>
       </div>
     );
   }
@@ -555,7 +532,8 @@ export function BookingFlow({
                     setService(s);
                     setTime("");
                     setDayChosen(false);
-                    setStep("products");
+                    setChosenServiceProducts(new Set());
+                    setStep(firstStepAfterService(s));
                   }}
                   className={cn(
                     "w-full flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
@@ -629,9 +607,23 @@ export function BookingFlow({
     );
   }
 
-  // ── Render: products add-on ────────────────────────────────────────────────
+  // ── Render: products used during the visit ─────────────────────────────────
 
-  if (step === "products") {
+  if (step === "serviceProducts") {
+    const available = service?.service_products ?? [];
+    const dry = available.filter((p) => p.category === "dry");
+    const wet = available.filter((p) => p.category === "wet");
+    const other = available.filter((p) => !p.category);
+
+    function toggleServiceProduct(id: string) {
+      setChosenServiceProducts((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
+
     return (
       <div className="space-y-4">
         <button
@@ -639,6 +631,70 @@ export function BookingFlow({
           className="flex items-center gap-2 text-sm text-muted"
         >
           <ChevronLeft size={16} /> Cambiar servicio
+        </button>
+
+        <div className="bg-surface rounded-xl border border-border p-3 flex items-center gap-3">
+          <div className="w-2 h-10 rounded-full shrink-0" style={{ background: service?.color }} />
+          <div>
+            <p className="font-semibold text-sm text-foreground">{service?.name}</p>
+            <p className="text-xs text-muted">
+              {service?.duration_minutes} min · ${service?.price}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="font-bold text-foreground">
+            ¿Qué productos te gustaría que usáramos durante tu visita?
+          </h2>
+          <p className="text-sm text-muted mt-0.5">
+            Opcional. Elige los que prefieras y los tendremos listos.
+          </p>
+        </div>
+
+        <ServiceProductGroup
+          title="Secos"
+          icon={<Wind size={13} />}
+          products={dry}
+          selected={chosenServiceProducts}
+          onToggle={toggleServiceProduct}
+        />
+        <ServiceProductGroup
+          title="Húmedos"
+          icon={<Droplet size={13} />}
+          products={wet}
+          selected={chosenServiceProducts}
+          onToggle={toggleServiceProduct}
+        />
+        <ServiceProductGroup
+          title="Otros"
+          products={other}
+          selected={chosenServiceProducts}
+          onToggle={toggleServiceProduct}
+        />
+
+        <button
+          onClick={() => setStep("products")}
+          className="w-full h-12 rounded-xl bg-brand text-white font-semibold"
+        >
+          {chosenServiceProducts.size > 0
+            ? `Continuar con ${chosenServiceProducts.size} producto${chosenServiceProducts.size > 1 ? "s" : ""} →`
+            : "Continuar sin elegir →"}
+        </button>
+      </div>
+    );
+  }
+
+  // ── Render: products add-on ────────────────────────────────────────────────
+
+  if (step === "products") {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={() => setStep(firstStepAfterService(service))}
+          className="flex items-center gap-2 text-sm text-muted"
+        >
+          <ChevronLeft size={16} /> Volver
         </button>
 
         <div className="bg-surface rounded-xl border border-border p-3 flex items-center gap-3">
@@ -989,6 +1045,15 @@ export function BookingFlow({
               />
             );
           })}
+          {chosenServiceProducts.size > 0 && (
+            <SummaryRow
+              label="Productos a usar"
+              value={(service?.service_products ?? [])
+                .filter((p) => chosenServiceProducts.has(p.id))
+                .map((p) => p.name)
+                .join(", ")}
+            />
+          )}
           <SummaryRow label="Método de pago" value="En el local" />
           <div className="flex items-center justify-between px-4 py-3 gap-3 bg-brand-light">
             <span className="text-sm font-bold text-foreground">Total</span>
@@ -1007,6 +1072,72 @@ export function BookingFlow({
         {loading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
         {loading ? "Reservando..." : "Confirmar cita"}
       </button>
+    </div>
+  );
+}
+
+function ServiceProductGroup({
+  title,
+  icon,
+  products,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  products: ServiceProduct[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  if (products.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-bold text-muted uppercase tracking-wide flex items-center gap-1.5">
+        {icon}
+        {title}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {products.map((p) => {
+          const active = selected.has(p.id);
+          return (
+            <button
+              key={p.id}
+              onClick={() => onToggle(p.id)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors",
+                active
+                  ? "bg-brand-light border-brand"
+                  : "bg-surface border-border active:bg-background"
+              )}
+            >
+              {p.image_url ? (
+                <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
+                  <Image
+                    src={p.image_url}
+                    alt={p.name}
+                    width={36}
+                    height={36}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-9 h-9 rounded-lg bg-background border border-border flex items-center justify-center shrink-0">
+                  <ShoppingBag size={14} className="text-muted" />
+                </div>
+              )}
+              <span
+                className={cn(
+                  "text-xs font-semibold flex-1 min-w-0 truncate",
+                  active ? "text-brand" : "text-foreground"
+                )}
+              >
+                {p.name}
+              </span>
+              {active && <Check size={14} className="text-brand shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

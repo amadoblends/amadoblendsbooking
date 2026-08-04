@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Reachable without a session. /verificar and /configurar-perfil are NOT here
+// on purpose: they need a logged-in user and guard themselves.
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/manifest.json", "/sw.js"];
 
 export async function updateSession(request: NextRequest) {

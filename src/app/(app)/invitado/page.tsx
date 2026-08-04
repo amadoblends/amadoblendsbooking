@@ -1,9 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { UserPlus } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
-import { GuestAdder } from "@/components/booking/guest-adder";
+import { GuestBookingFlow } from "@/components/booking/guest-booking-flow";
 
 export default async function InvitadoPage() {
   const supabase = await createClient();
@@ -15,33 +13,27 @@ export default async function InvitadoPage() {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, full_name, first_name")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (!client) redirect("/configurar-perfil");
 
-  const [{ data: upcoming }, { data: services }] = await Promise.all([
-    supabase
-      .from("appointments")
-      .select("id, starts_at, services(name)")
-      .eq("client_id", client.id)
-      .gte("starts_at", new Date().toISOString())
-      .neq("status", "cancelada")
-      .order("starts_at", { ascending: true })
-      .limit(10),
+  const [{ data: services }, { data: availability }, { data: settings }] = await Promise.all([
     supabase
       .from("services")
-      .select("id, name, duration_minutes, price")
+      .select("id, name, duration_minutes, price, color, image_url, kind")
       .eq("is_public", true)
       .order("price"),
+    supabase.from("availability").select("*").order("weekday"),
+    supabase
+      .from("booking_settings")
+      .select("booking_window_days, min_notice_minutes")
+      .eq("id", 1)
+      .single(),
   ]);
 
-  const appointments = (upcoming ?? []).map((a) => ({
-    id: a.id,
-    starts_at: a.starts_at,
-    serviceName: (a.services as unknown as { name: string }).name,
-  }));
+  const ownerName = client.first_name ?? client.full_name.split(" ")[0];
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
@@ -49,26 +41,18 @@ export default async function InvitadoPage() {
         <BackButton />
         <div>
           <h1 className="text-xl font-bold text-foreground">Agregar invitado</h1>
-          <p className="text-sm text-muted">Trae a un amigo a tu cita</p>
+          <p className="text-sm text-muted">Reserva una cita para alguien más</p>
         </div>
       </header>
 
-      {appointments.length === 0 ? (
-        <div className="bg-surface rounded-2xl border border-border p-8 text-center space-y-3">
-          <UserPlus size={32} className="text-muted mx-auto" />
-          <p className="text-sm text-muted">
-            No tienes citas próximas. Reserva una cita primero para poder agregar un invitado.
-          </p>
-          <Link
-            href="/reservar"
-            className="inline-block bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
-          >
-            Reservar cita
-          </Link>
-        </div>
-      ) : (
-        <GuestAdder appointments={appointments} services={services ?? []} />
-      )}
+      <GuestBookingFlow
+        clientId={client.id}
+        ownerName={ownerName}
+        services={services ?? []}
+        availability={availability ?? []}
+        bookingWindowDays={settings?.booking_window_days ?? 30}
+        minNoticeMinutes={settings?.min_notice_minutes ?? 60}
+      />
     </div>
   );
 }

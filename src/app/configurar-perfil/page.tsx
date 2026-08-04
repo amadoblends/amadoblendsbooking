@@ -24,8 +24,11 @@ export default function ConfigurarPerfilPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
 
+    const [first, ...rest] = name.trim().split(" ");
     const { error: insertError } = await supabase.from("clients").insert({
       full_name: name.trim(),
+      first_name: first,
+      last_name: rest.join(" ") || null,
       phone: phone.trim(),
       email: user.email ?? null,
       user_id: user.id,

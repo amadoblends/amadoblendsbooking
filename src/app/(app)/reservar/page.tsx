@@ -47,6 +47,7 @@ export default async function ReservarPage({
       .from("products")
       .select("id, name, price, image_url")
       .gt("stock", 0)
+      .eq("is_visible_for_sale", true)
       .order("name"),
     supabase
       .from("promotions")
@@ -54,11 +55,38 @@ export default async function ReservarPage({
       .eq("is_active", true),
   ]);
 
-  // Names of the single services included in each combo (hidden singles too)
-  const [{ data: packageItems }, { data: allServiceNames }] = await Promise.all([
-    supabase.from("service_package_items").select("package_id, item_service_id"),
-    supabase.from("services").select("id, name"),
-  ]);
+  // Combo contents + the products each service offers during the visit
+  const [{ data: packageItems }, { data: allServiceNames }, { data: serviceProducts }] =
+    await Promise.all([
+      supabase.from("service_package_items").select("package_id, item_service_id"),
+      supabase.from("services").select("id, name"),
+      supabase
+        .from("service_products")
+        .select("service_id, products(id, name, image_url, category, available_for_services)"),
+    ]);
+
+  const serviceProductsByService = new Map<
+    string,
+    { id: string; name: string; image_url: string | null; category: "dry" | "wet" | null }[]
+  >();
+  for (const row of serviceProducts ?? []) {
+    const product = row.products as unknown as {
+      id: string;
+      name: string;
+      image_url: string | null;
+      category: "dry" | "wet" | null;
+      available_for_services: boolean;
+    } | null;
+    if (!product || !product.available_for_services) continue;
+    const list = serviceProductsByService.get(row.service_id) ?? [];
+    list.push({
+      id: product.id,
+      name: product.name,
+      image_url: product.image_url,
+      category: product.category,
+    });
+    serviceProductsByService.set(row.service_id, list);
+  }
 
   const nameById = new Map((allServiceNames ?? []).map((s) => [s.id, s.name]));
   const includesByPackage = new Map<string, string[]>();
@@ -73,11 +101,12 @@ export default async function ReservarPage({
   const servicesWithIncludes = (services ?? []).map((s) => ({
     ...s,
     included_names: s.kind === "package" ? (includesByPackage.get(s.id) ?? []) : [],
+    service_products: serviceProductsByService.get(s.id) ?? [],
   }));
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4">
-      <RealtimeRefresher tables={["services", "promotions", "products"]} />
+      <RealtimeRefresher tables={["services", "promotions", "products", "service_products"]} />
       <header className="mb-5 flex items-center gap-3">
         <BackButton />
         <div>
