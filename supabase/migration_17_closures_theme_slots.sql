@@ -1,10 +1,13 @@
 -- ============================================================
--- migration_17_closures_theme_slots.sql
--- Run in Supabase SQL Editor
+-- migration_17_closures_theme_slots.sql   (CORREGIDA)
+-- Run in Supabase SQL Editor. Segura de correr varias veces.
 -- 1) Cierres por rango de fechas con motivo
 -- 2) Tema (claro/oscuro) del panel del barbero
 -- 3) Intervalo de turnos global + optimización de huecos
--- 4) Estado "no asistió" en citas
+--
+-- NOTA: el estado "no asistió" va aparte, en migration_18,
+-- porque status es un ENUM y Postgres no deja usar un valor
+-- nuevo en la misma transacción donde se agrega.
 -- ============================================================
 
 -- ── 1. Cierres (vacaciones, feriados, días personales) ──────
@@ -42,6 +45,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- Los cierres también ocupan horario: se suman a get_busy_times
+-- (aquí todavía NO se menciona 'no_show': eso llega en la 18)
 CREATE OR REPLACE FUNCTION public.get_busy_times(p_start timestamptz, p_end timestamptz)
 RETURNS TABLE(starts_at timestamptz, ends_at timestamptz)
 LANGUAGE sql
@@ -50,7 +54,7 @@ SET search_path = public
 AS $$
   SELECT a.starts_at, a.ends_at
   FROM appointments a
-  WHERE a.status NOT IN ('cancelada','no_show')
+  WHERE a.status <> 'cancelada'
     AND a.starts_at < p_end AND a.ends_at > p_start
   UNION ALL
   SELECT h.starts_at, h.ends_at
@@ -86,34 +90,25 @@ $$;
 
 -- ── 2. Tema del panel ───────────────────────────────────────
 ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS theme text NOT NULL DEFAULT 'dark'
-    CHECK (theme IN ('dark', 'light'));
+  ADD COLUMN IF NOT EXISTS theme text NOT NULL DEFAULT 'dark';
+
+DO $$
+BEGIN
+  ALTER TABLE public.profiles ADD CONSTRAINT profiles_theme_check
+    CHECK (theme IN ('dark','light'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ── 3. Intervalo de turnos y optimización ───────────────────
 ALTER TABLE public.booking_settings
-  ADD COLUMN IF NOT EXISTS slot_interval_minutes int NOT NULL DEFAULT 30
-    CHECK (slot_interval_minutes BETWEEN 5 AND 240),
+  ADD COLUMN IF NOT EXISTS slot_interval_minutes int NOT NULL DEFAULT 30,
   ADD COLUMN IF NOT EXISTS optimize_gaps boolean NOT NULL DEFAULT false;
 
--- ── 4. "No asistió" como estado propio ──────────────────────
 DO $$
 BEGIN
-  ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS appointments_status_check;
-  ALTER TABLE public.appointments
-    ADD CONSTRAINT appointments_status_check
-    CHECK (status IN ('pendiente','confirmada','completada','cancelada','no_show'));
-EXCEPTION WHEN others THEN NULL;
+  ALTER TABLE public.booking_settings ADD CONSTRAINT booking_slot_interval_check
+    CHECK (slot_interval_minutes BETWEEN 5 AND 240);
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- La restricción de solapamiento debe ignorar también las ausencias
-DO $$
-BEGIN
-  ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS appointments_no_overlap;
-  ALTER TABLE public.appointments
-    ADD CONSTRAINT appointments_no_overlap
-    EXCLUDE USING gist (tstzrange(starts_at, ends_at) WITH &&)
-    WHERE (status NOT IN ('cancelada','no_show'));
-EXCEPTION WHEN others THEN NULL;
-END $$;
-
-SELECT 'migración 17 lista' AS resultado;
+SELECT 'migración 17 lista — ahora corre la 18' AS resultado;
