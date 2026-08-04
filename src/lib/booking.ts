@@ -39,6 +39,15 @@ export function slotToDate(dateStr: string, mins: number) {
   return new Date(y, mo - 1, d, Math.floor(mins / 60), mins % 60, 0);
 }
 
+export interface SlotOptions {
+  /** Overrides the day's own step; how often times are offered. */
+  intervalMinutes?: number;
+  /** Extra minutes reserved after the service (cleanup/prep). */
+  bufferMinutes?: number;
+  /** Prefer times that butt against existing appointments. */
+  optimizeGaps?: boolean;
+}
+
 /** Start times where a service of `durMins` fits: inside hours, outside the
  *  break, past the notice window and not overlapping anything busy. */
 export function generateSlots(
@@ -46,31 +55,51 @@ export function generateSlots(
   durMins: number,
   minNoticeMins: number,
   dateStr: string,
-  busy: BusyInterval[]
+  busy: BusyInterval[],
+  options: SlotOptions = {}
 ): string[] {
   if (!day.is_active) return [];
+
   const start = toMins(day.start_time);
   const end = toMins(day.end_time);
-  const step = day.slot_minutes;
+  const step = options.intervalMinutes ?? day.slot_minutes;
+  const buffer = options.bufferMinutes ?? 0;
   const breakStart = day.break_start_time ? toMins(day.break_start_time) : null;
   const breakEnd = day.break_end_time ? toMins(day.break_end_time) : null;
   const notBefore = addMinutes(new Date(), minNoticeMins);
-  const out: string[] = [];
 
-  for (let t = start; t + durMins <= end; t += step) {
-    if (breakStart !== null && breakEnd !== null && t < breakEnd && t + durMins > breakStart) {
+  // The full block the barber is occupied for, service plus buffer
+  const blockMins = durMins + buffer;
+  const candidates: { mins: number; touchesBooking: boolean }[] = [];
+
+  for (let t = start; t + blockMins <= end; t += step) {
+    if (breakStart !== null && breakEnd !== null && t < breakEnd && t + blockMins > breakStart) {
       continue;
     }
     const slotStart = slotToDate(dateStr, t);
     if (isBefore(slotStart, notBefore)) continue;
 
     const sMs = slotStart.getTime();
-    const eMs = sMs + durMins * 60000;
+    const eMs = sMs + blockMins * 60000;
     if (busy.some((b) => sMs < b.end && eMs > b.start)) continue;
 
-    out.push(fromMins(t));
+    // A slot "touches" a booking when it starts right as one ends, or ends
+    // right as the next one starts — those leave no dead time behind.
+    const touchesBooking = busy.some(
+      (b) => Math.abs(b.end - sMs) < 60_000 || Math.abs(eMs - b.start) < 60_000
+    );
+
+    candidates.push({ mins: t, touchesBooking });
   }
-  return out;
+
+  if (!options.optimizeGaps) return candidates.map((c) => fromMins(c.mins));
+
+  // With optimization on, only offer gap-free times — unless that would
+  // leave the client with nothing, in which case show everything.
+  const tight = candidates.filter((c) => c.touchesBooking);
+  const hasAnyBooking = busy.length > 0;
+  const chosen = hasAnyBooking && tight.length > 0 ? tight : candidates;
+  return chosen.map((c) => fromMins(c.mins));
 }
 
 export const GUEST_RELATIONSHIPS = [

@@ -102,8 +102,14 @@ export function BookingWizard({
   promotions = [],
   bookingWindowDays,
   minNoticeMinutes,
+  slotIntervalMinutes,
+  bufferMinutes = 0,
+  optimizeGaps = false,
   preselectedServiceId,
   startAsGuest = false,
+  barberName = "Amado",
+  barberAvatarUrl = null,
+  shopAddress = null,
 }: {
   clientId: string;
   ownerName: string;
@@ -113,8 +119,14 @@ export function BookingWizard({
   promotions?: WizardPromotion[];
   bookingWindowDays: number;
   minNoticeMinutes: number;
+  slotIntervalMinutes?: number;
+  bufferMinutes?: number;
+  optimizeGaps?: boolean;
   preselectedServiceId?: string;
   startAsGuest?: boolean;
+  barberName?: string;
+  barberAvatarUrl?: string | null;
+  shopAddress?: string | null;
 }) {
   const router = useRouter();
   const { t, lang } = useT();
@@ -146,6 +158,7 @@ export function BookingWizard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
 
   const today = startOfDay(new Date());
   const maxDate = addDays(today, bookingWindowDays);
@@ -166,6 +179,16 @@ export function BookingWizard({
   const grandTotal = servicePrice + cartTotal;
 
   const availableUseProducts = service?.service_products ?? [];
+
+  // Shared slot rules from the barber's booking settings
+  const slotOptions = useMemo(
+    () => ({
+      intervalMinutes: slotIntervalMinutes,
+      bufferMinutes,
+      optimizeGaps,
+    }),
+    [slotIntervalMinutes, bufferMinutes, optimizeGaps]
+  );
 
   // Steps that actually apply to this booking
   const steps = useMemo<Step[]>(() => {
@@ -236,7 +259,7 @@ export function BookingWizard({
 
   const slots = useMemo(() => {
     if (!dayAvail || !service) return [];
-    return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, busy);
+    return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, busy, slotOptions);
   }, [dayAvail, service, date, minNoticeMinutes, busy]);
 
   const availFor = useCallback(
@@ -255,7 +278,7 @@ export function BookingWizard({
       const ds = format(d, "yyyy-MM-dd");
       const av = availFor(ds);
       if (!av) return null;
-      return generateSlots(av, service.duration_minutes, minNoticeMinutes, ds, busy).length;
+      return generateSlots(av, service.duration_minutes, minNoticeMinutes, ds, busy, slotOptions).length;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [service, busy, minNoticeMinutes, availFor]
@@ -370,6 +393,9 @@ export function BookingWizard({
       );
     }
 
+    // Short human-readable code from the appointment id
+    setConfirmationCode(inserted.id.replace(/-/g, "").slice(0, 6).toUpperCase());
+
     releaseHold();
     setLoading(false);
     setDone(true);
@@ -391,42 +417,94 @@ export function BookingWizard({
 
   // ── Done screen ──────────────────────────────────────────────────────────
   if (done) {
+    const endMins = toMins(time) + (service?.duration_minutes ?? 0);
+    const endLabel = fmtSlot(
+      `${String(Math.floor(endMins / 60)).padStart(2, "0")}:${String(endMins % 60).padStart(2, "0")}`
+    );
+
     return (
-      <div className="space-y-5 py-6">
-        <div className="flex flex-col items-center text-center space-y-3">
-          <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center">
-            <Check size={36} className="text-success" />
+      <div className="py-4 space-y-6">
+        {/* Confirmation mark */}
+        <div className="flex flex-col items-center text-center gap-3">
+          <div className="relative">
+            <span className="absolute inset-0 rounded-full bg-success/20 animate-ping" />
+            <div className="relative w-20 h-20 rounded-full bg-success flex items-center justify-center">
+              <Check size={38} className="text-white" strokeWidth={3} />
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-foreground">{t("booking.confirmed")}</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">{t("booking.confirmed")}</h2>
+            <p className="text-[15px] text-muted mt-1">{t("booking.confirmedHint")}</p>
+          </div>
+          {confirmationCode && (
+            <span className="font-mono text-sm font-bold tracking-widest text-foreground bg-surface border border-border rounded-full px-4 py-1.5">
+              #{confirmationCode}
+            </span>
+          )}
         </div>
 
+        {/* Barber */}
+        <div className="bg-surface rounded-2xl border border-border p-4 flex items-center gap-3.5">
+          <div className="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-brand-light flex items-center justify-center relative">
+            {barberAvatarUrl ? (
+              <Image src={barberAvatarUrl} alt={barberName} fill className="object-cover" sizes="56px" />
+            ) : (
+              <Scissors size={22} className="text-brand" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] text-muted uppercase tracking-wide">{t("booking.barber")}</p>
+            <p className="font-bold text-foreground text-lg leading-tight">{barberName}</p>
+          </div>
+        </div>
+
+        {/* Details */}
         <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
-          {forGuest && <Row label={t("guest.name")} value={guestName} />}
+          <Row
+            label={t("booking.forWhom")}
+            value={forGuest ? guestName : ownerName}
+          />
           <Row label={t("booking.service")} value={service?.name ?? ""} />
           <Row
             label={t("booking.date")}
             value={format(new Date(date + "T00:00:00"), "EEEE d MMMM yyyy", { locale })}
           />
-          <Row label={t("booking.time")} value={fmtSlot(time)} />
-          <div className="flex items-center justify-between px-4 py-3 bg-brand-light">
-            <span className="text-sm font-bold text-foreground">{t("booking.total")}</span>
-            <span className="text-base font-black text-brand">${grandTotal.toFixed(2)}</span>
+          <Row label={t("booking.time")} value={`${fmtSlot(time)} – ${endLabel}`} />
+          <Row
+            label={t("booking.duration")}
+            value={`${service?.duration_minutes} ${t("booking.minutes")}`}
+          />
+          {shopAddress && <Row label={t("booking.location")} value={shopAddress} />}
+          <Row label={t("booking.payment")} value={t("booking.payAtShop")} />
+          <div className="flex items-center justify-between px-4 py-3.5 bg-brand-light">
+            <span className="text-[15px] font-bold text-foreground">{t("booking.total")}</span>
+            <span className="text-lg font-black text-brand">${grandTotal.toFixed(2)}</span>
           </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Primary action, then quiet links */}
+        <div className="space-y-3">
           <button
-            onClick={restart}
-            className="flex-1 h-13 rounded-2xl border border-border text-base font-semibold text-foreground"
+            onClick={() => router.push("/")}
+            className="w-full h-14 rounded-2xl bg-brand text-white font-bold text-base"
           >
-            {t("booking.anotherBooking")}
+            {t("booking.backHome")}
           </button>
-          <button
-            onClick={() => router.push("/citas")}
-            className="flex-1 h-13 rounded-2xl bg-brand text-white text-base font-bold"
-          >
-            {t("nav.myBookings")}
-          </button>
+
+          <div className="flex items-center justify-center gap-5">
+            <button
+              onClick={() => router.push("/citas")}
+              className="text-sm font-semibold text-muted underline underline-offset-4 decoration-border"
+            >
+              {t("nav.myBookings")}
+            </button>
+            <button
+              onClick={restart}
+              className="text-sm font-semibold text-muted underline underline-offset-4 decoration-border"
+            >
+              {t("booking.anotherBooking")}
+            </button>
+          </div>
         </div>
       </div>
     );

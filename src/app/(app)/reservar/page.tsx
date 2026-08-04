@@ -39,7 +39,9 @@ export default async function ReservarPage({
     supabase.from("availability").select("*").order("weekday"),
     supabase
       .from("booking_settings")
-      .select("booking_window_days, min_notice_minutes")
+      .select(
+        "booking_window_days, min_notice_minutes, buffer_minutes, slot_interval_minutes, optimize_gaps"
+      )
       .eq("id", 1)
       .single(),
     supabase
@@ -102,6 +104,14 @@ export default async function ReservarPage({
 
   const ownerName = client.first_name ?? client.full_name.split(" ")[0];
 
+  // Barber details for the confirmation screen
+  const { data: barber } = await supabase
+    .from("profiles")
+    .select("full_name, avatar_url")
+    .eq("role", "admin")
+    .limit(1)
+    .maybeSingle();
+
   return (
     <div className="px-5 pt-[max(20px,var(--safe-top))] pb-[max(28px,var(--safe-bottom))]">
       <RealtimeRefresher tables={["services", "promotions", "products", "service_products"]} />
@@ -115,8 +125,14 @@ export default async function ReservarPage({
         promotions={promotions ?? []}
         bookingWindowDays={settings?.booking_window_days ?? 30}
         minNoticeMinutes={settings?.min_notice_minutes ?? 60}
+        slotIntervalMinutes={settings?.slot_interval_minutes ?? undefined}
+        bufferMinutes={settings?.buffer_minutes ?? 0}
+        optimizeGaps={settings?.optimize_gaps ?? false}
         preselectedServiceId={params.serviceId}
         startAsGuest={params.guest === "1"}
+        barberName={barber?.full_name ?? "Amado"}
+        barberAvatarUrl={barber?.avatar_url ?? null}
+        shopAddress="Amado Blends Barbershop"
       />
     </div>
   );

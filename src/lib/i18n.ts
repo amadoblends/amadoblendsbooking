@@ -101,7 +101,14 @@ const dict = {
     es: "Sin horarios disponibles. Prueba otra fecha.",
     en: "No times available. Try another date.",
   },
-  "booking.anotherBooking": { es: "Otra cita", en: "Another booking" },
+  "booking.anotherBooking": { es: "Reservar otra cita", en: "Book another appointment" },
+  "booking.confirmedHint": {
+    es: "Te esperamos. Guarda tu código de confirmación.",
+    en: "See you soon. Keep your confirmation code.",
+  },
+  "booking.barber": { es: "Tu barbero", en: "Your barber" },
+  "booking.location": { es: "Ubicación", en: "Location" },
+  "booking.backHome": { es: "Volver al inicio", en: "Back home" },
 
   // Breadcrumb
   "booking.crumbWho": { es: "Para quién", en: "For who" },
