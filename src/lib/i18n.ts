@@ -186,6 +186,7 @@ const dict = {
     en: "Professional products for your best look",
   },
   "shop.empty": { es: "Pronto tendremos productos disponibles.", en: "Products coming soon." },
+  "shop.buyOnline": { es: "Comprar online", en: "Buy online" },
 
   // Common
   "common.back": { es: "Volver", en: "Back" },

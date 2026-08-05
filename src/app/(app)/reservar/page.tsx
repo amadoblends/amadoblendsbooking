@@ -56,6 +56,13 @@ export default async function ReservarPage({
       .eq("is_active", true),
   ]);
 
+  // Closures explain why a day is unavailable instead of just greying it out
+  const { data: closures } = await supabase
+    .from("closures")
+    .select("id, starts_on, ends_on, reason, description")
+    .gte("ends_on", new Date().toISOString().slice(0, 10))
+    .order("starts_on");
+
   // Combo contents + the products each service offers during the visit
   const [{ data: packageItems }, { data: allServiceNames }, { data: serviceProducts }] =
     await Promise.all([
@@ -128,6 +135,7 @@ export default async function ReservarPage({
         slotIntervalMinutes={settings?.slot_interval_minutes ?? undefined}
         bufferMinutes={settings?.buffer_minutes ?? 0}
         optimizeGaps={settings?.optimize_gaps ?? false}
+        closures={closures ?? []}
         preselectedServiceId={params.serviceId}
         startAsGuest={params.guest === "1"}
         barberName={barber?.full_name ?? "Amado"}

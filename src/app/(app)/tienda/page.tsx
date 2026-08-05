@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { ShoppingBag, Package } from "lucide-react";
+import { ShoppingBag, Package, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { BackButton } from "@/components/ui/back-button";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
@@ -17,7 +17,7 @@ export default async function TiendaPage() {
   const { t } = await getT();
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price, stock, image_url")
+    .select("id, name, price, stock, image_url, description, purchase_url")
     .gt("stock", 0)
     .eq("is_visible_for_sale", true)
     .order("name");
@@ -60,9 +60,12 @@ export default async function TiendaPage() {
                   <ShoppingBag size={32} className="text-brand/50" />
                 </div>
               )}
-              <div className="p-3">
+              <div className="p-3 space-y-1.5">
                 <p className="text-sm font-semibold text-foreground leading-tight">{p.name}</p>
-                <div className="flex items-center justify-between mt-1.5">
+                {p.description && (
+                  <p className="text-xs text-muted line-clamp-2 leading-snug">{p.description}</p>
+                )}
+                <div className="flex items-center justify-between">
                   <p className="text-base font-bold text-brand">${p.price}</p>
                   {p.stock <= 3 && (
                     <span className="text-[10px] text-warning font-semibold">
@@ -70,6 +73,17 @@ export default async function TiendaPage() {
                     </span>
                   )}
                 </div>
+                {/* Only rendered when the barber added a link */}
+                {p.purchase_url && (
+                  <a
+                    href={p.purchase_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 h-9 rounded-xl border border-brand/40 bg-brand-light text-brand text-xs font-bold active:bg-brand/15"
+                  >
+                    <ExternalLink size={12} /> {t("shop.buyOnline")}
+                  </a>
+                )}
               </div>
             </div>
           ))}

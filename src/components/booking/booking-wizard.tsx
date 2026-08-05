@@ -20,6 +20,12 @@ import {
   GUEST_RELATIONSHIPS, WEEK_LABELS, generateSlots, fmtSlot, slotToDate, toMins,
   type AvailDay, type BusyInterval, type GuestRelationship,
 } from "@/lib/booking";
+import {
+  ClosureNotice,
+  ClosureChip,
+  closureForDate,
+  type ClientClosure,
+} from "./closure-notice";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +111,7 @@ export function BookingWizard({
   slotIntervalMinutes,
   bufferMinutes = 0,
   optimizeGaps = false,
+  closures = [],
   preselectedServiceId,
   startAsGuest = false,
   barberName = "Amado",
@@ -122,6 +129,7 @@ export function BookingWizard({
   slotIntervalMinutes?: number;
   bufferMinutes?: number;
   optimizeGaps?: boolean;
+  closures?: ClientClosure[];
   preselectedServiceId?: string;
   startAsGuest?: boolean;
   barberName?: string;
@@ -159,6 +167,8 @@ export function BookingWizard({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+  // Tapping a closed day explains why instead of just being greyed out
+  const [openClosure, setOpenClosure] = useState<ClientClosure | null>(null);
 
   const today = startOfDay(new Date());
   const maxDate = addDays(today, bookingWindowDays);
@@ -844,9 +854,12 @@ export function BookingWizard({
                 start: startOfWeek(startOfMonth(calCursor), { weekStartsOn: 1 }),
                 end: endOfWeek(endOfMonth(calCursor), { weekStartsOn: 1 }),
               }).map((d) => {
+                const dayKey = format(d, "yyyy-MM-dd");
                 const inMonth = isSameMonth(d, calCursor);
                 const capacity = dayCapacity(d);
+                const closed = closureForDate(dayKey, closures);
                 const disabled =
+                  !!closed ||
                   !activeWeekdays.has(d.getDay()) ||
                   isBefore(startOfDay(d), today) ||
                   isAfter(startOfDay(d), maxDate) ||
@@ -858,15 +871,21 @@ export function BookingWizard({
                   <button
                     key={d.toISOString()}
                     onClick={() => {
+                      // A closed day explains itself rather than doing nothing
+                      if (closed) {
+                        setOpenClosure(closed);
+                        return;
+                      }
                       if (disabled) return;
-                      setDate(format(d, "yyyy-MM-dd"));
+                      setDate(dayKey);
                       setTime("");
                       goNext();
                     }}
                     className={cn(
                       "aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 leading-none transition-colors min-h-[46px]",
                       !inMonth && "opacity-30",
-                      disabled && "cursor-not-allowed",
+                      disabled && !closed && "cursor-not-allowed",
+                      closed && "bg-danger-light",
                       isSelected && "bg-brand",
                       !isSelected && isToday && "border border-brand"
                     )}
@@ -875,21 +894,31 @@ export function BookingWizard({
                       className={cn(
                         "text-sm font-medium",
                         disabled ? "text-muted/30" : "text-foreground",
+                        closed && "text-danger/70",
                         isSelected && "text-white font-bold",
                         !isSelected && isToday && "text-brand font-bold"
                       )}
                     >
                       {format(d, "d")}
                     </span>
-                    {capacity !== null && inMonth && (
-                      <span
-                        className={cn(
-                          "text-[10px] font-bold",
-                          isSelected ? "text-white/80" : capacity === 0 ? "text-danger/60" : "text-success"
-                        )}
-                      >
-                        {capacity}
-                      </span>
+                    {closed && inMonth ? (
+                      <ClosureChip reason={closed.reason} lang={lang} />
+                    ) : (
+                      capacity !== null &&
+                      inMonth && (
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold",
+                            isSelected
+                              ? "text-white/80"
+                              : capacity === 0
+                                ? "text-danger/60"
+                                : "text-success"
+                          )}
+                        >
+                          {capacity}
+                        </span>
+                      )
                     )}
                   </button>
                 );
@@ -1023,8 +1052,35 @@ export function BookingWizard({
           </button>
         </div>
       )}
+
+      <ClosureNotice
+        closure={openClosure}
+        returnDate={openClosure ? nextOpenDay(openClosure, activeWeekdays, closures) : null}
+        onClose={() => setOpenClosure(null)}
+        lang={lang}
+      />
     </div>
   );
+}
+
+/** First working day after a closure ends, skipping days off and other
+ *  closures — so the client is never told to come back on a closed day. */
+function nextOpenDay(
+  closure: ClientClosure,
+  activeWeekdays: Set<number>,
+  closures: ClientClosure[]
+): Date | null {
+  if (activeWeekdays.size === 0) return null;
+  const last = new Date(closure.ends_on + "T00:00:00");
+
+  for (let i = 1; i <= 60; i++) {
+    const candidate = addDays(last, i);
+    if (!activeWeekdays.has(candidate.getDay())) continue;
+    const key = format(candidate, "yyyy-MM-dd");
+    if (closures.some((c) => key >= c.starts_on && key <= c.ends_on)) continue;
+    return candidate;
+  }
+  return null;
 }
 
 // ── Building blocks ────────────────────────────────────────────────────────
