@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck, Check, Globe, ArrowLeft } from "lucide-react";
+import { Loader2, ShieldCheck, Check, Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { OtpPanel } from "@/components/auth/otp-panel";
 import { AvatarUploader } from "@/components/ui/avatar-uploader";
 import { LANGUAGES, type Language } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -31,10 +32,8 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
   const [language, setLanguage] = useState<Language>(profile.language);
 
   const [stage, setStage] = useState<Stage>("edit");
-  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [switchingLang, setSwitchingLang] = useState(false);
 
   // Photo and language are low-risk; identity fields need a code
@@ -92,11 +91,11 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
       setError("Ingresa tu nombre.");
       return;
     }
-    setLoading(true);
     setError(null);
 
-    // Low-risk edits save straight away
+    // Photo and language are low risk — save straight away
     if (!sensitiveChanged) {
+      setLoading(true);
       const failure = await persist();
       setLoading(false);
       if (failure) {
@@ -108,50 +107,8 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
       return;
     }
 
-    // Identity changed → confirm ownership of the account first
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: profile.email,
-      options: { shouldCreateUser: false },
-    });
-
-    if (otpError) {
-      setError("No se pudo enviar el código. Inténtalo en un minuto.");
-      setLoading(false);
-      return;
-    }
-
-    setNotice(`Enviamos un código a ${profile.email}`);
+    // Identity changed → OtpPanel sends the code and applies the change
     setStage("otp");
-    setLoading(false);
-  }
-
-  async function handleVerify(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      email: profile.email,
-      token: otp.trim(),
-      type: "email",
-    });
-
-    if (verifyError) {
-      setError("Código incorrecto o expirado.");
-      setLoading(false);
-      return;
-    }
-
-    const failure = await persist();
-    setLoading(false);
-    if (failure) {
-      setError(failure);
-      return;
-    }
-    setStage("saved");
-    router.refresh();
   }
 
   // ── Saved ───────────────────────────────────────────────────────────────
@@ -182,47 +139,24 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
 
   if (stage === "otp") {
     return (
-      <div className="bg-surface rounded-2xl border border-border p-5 space-y-4">
-        <button
-          onClick={() => setStage("edit")}
-          className="flex items-center gap-1.5 text-sm text-muted"
-        >
-          <ArrowLeft size={15} /> Volver a editar
-        </button>
-
-        <div className="text-center">
-          <div className="w-14 h-14 rounded-2xl bg-brand-light flex items-center justify-center mx-auto mb-3">
-            <ShieldCheck size={26} className="text-brand" />
-          </div>
-          <h2 className="font-bold text-foreground">Confirma que eres tú</h2>
-          <p className="text-sm text-muted mt-1">{notice}</p>
-        </div>
-
-        <form onSubmit={handleVerify} className="space-y-3">
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            placeholder="000000"
-            className="w-full h-14 rounded-xl border border-border bg-background text-center text-2xl font-black tracking-[0.4em] text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
-            autoFocus
-            required
-          />
-
-          {error && <p className="text-xs text-danger text-center">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading || otp.length < 6}
-            className="w-full h-12 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 size={16} className="animate-spin" />}
-            Confirmar y guardar
-          </button>
-        </form>
+      <div className="bg-surface rounded-2xl border border-border p-5">
+        <OtpPanel
+          email={profile.email}
+          reason="profile"
+          onBack={() => setStage("edit")}
+          onVerified={async () => {
+            // Identity proven — now write the pending changes
+            const failure = await persist();
+            if (failure) {
+              setError(failure);
+              setStage("edit");
+              return;
+            }
+            setStage("saved");
+            router.refresh();
+          }}
+        />
+        {error && <p className="text-sm text-danger text-center mt-3">{error}</p>}
       </div>
     );
   }
