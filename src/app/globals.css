@@ -44,8 +44,9 @@
   --color-danger: var(--color-danger);
   --color-danger-light: var(--color-danger-light);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans-app);
+  --font-display: var(--font-display-app);
+  --font-mono: var(--font-mono-app);
 }
 
 * {
@@ -88,8 +89,30 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans-app), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.012em;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.028em;
+}
+
+/* Serif reserved for the brand and hero titles — never for dense UI */
+.font-display {
+  font-family: var(--font-display-app), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+/* Times, dates and prices line up in columns instead of jittering */
+.tnum,
+time {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 input,
