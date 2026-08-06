@@ -26,6 +26,7 @@ import {
   closureForDate,
   type ClientClosure,
 } from "./closure-notice";
+import { saveDraft, loadDraft, clearDraft } from "@/lib/booking-draft";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -169,6 +170,9 @@ export function BookingWizard({
   const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
   // Tapping a closed day explains why instead of just being greyed out
   const [openClosure, setOpenClosure] = useState<ClientClosure | null>(null);
+  // Shown when a restored booking's chosen time was taken while they were away
+  const [slotLostNotice, setSlotLostNotice] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const today = startOfDay(new Date());
   const maxDate = addDays(today, bookingWindowDays);
@@ -234,6 +238,73 @@ export function BookingWizard({
     if (prev) goTo(prev);
   }
 
+  // ── Draft: survive an accidental exit ────────────────────────────────────
+  /*
+   * Restore once, on mount. A service chosen from the home screen wins over a
+   * stored draft, since that's a deliberate fresh start.
+   */
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    if (preselectedServiceId) {
+      clearDraft();
+      return;
+    }
+
+    const draft = loadDraft();
+    if (!draft) return;
+
+    const svc = services.find((s) => s.id === draft.serviceId);
+    if (!svc) {
+      // The service was deleted or hidden while they were away
+      clearDraft();
+      return;
+    }
+
+    setService(svc);
+    setForGuest(draft.forGuest);
+    setRelationship((draft.relationship as GuestRelationship | null) ?? null);
+    setGuestName(draft.guestName);
+    setTab(draft.tab);
+    setCart(draft.cart ?? {});
+    setChosenProducts(new Set(draft.chosenProducts ?? []));
+    setMaxReached(draft.maxReached ?? 0);
+
+    // A date in the past while they were away is no longer bookable
+    const stillAhead = draft.date >= format(new Date(), "yyyy-MM-dd");
+    setDate(stillAhead ? draft.date : format(new Date(), "yyyy-MM-dd"));
+    setCalCursor(startOfMonth(new Date((stillAhead ? draft.date : format(new Date(), "yyyy-MM-dd")) + "T00:00:00")));
+
+    // The hold was released when they left, so the time must be re-verified
+    // below once the busy list loads. Never jump straight to the summary.
+    setTime(stillAhead ? draft.time : "");
+    setStep(draft.step === "summary" ? "time" : (draft.step as Step));
+    setDraftRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist on every meaningful change
+  useEffect(() => {
+    if (done) return;
+    saveDraft({
+      step,
+      forGuest,
+      relationship,
+      guestName,
+      serviceId: service?.id ?? null,
+      tab,
+      cart,
+      chosenProducts: [...chosenProducts],
+      date,
+      time,
+      maxReached,
+    });
+  }, [
+    step, forGuest, relationship, guestName, service, tab, cart,
+    chosenProducts, date, time, maxReached, done,
+  ]);
+
   // ── Availability ─────────────────────────────────────────────────────────
   const dayAvail = useMemo(() => {
     const wd = new Date(date + "T00:00:00").getDay();
@@ -271,6 +342,20 @@ export function BookingWizard({
     if (!dayAvail || !service) return [];
     return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, busy, slotOptions);
   }, [dayAvail, service, date, minNoticeMinutes, busy]);
+
+  /*
+   * A restored booking proposes a time nobody was holding. Once the real
+   * availability arrives, confirm the slot is still there — and if someone
+   * else took it, say so plainly and send them back to pick another.
+   */
+  useEffect(() => {
+    if (!draftRestored || busyLoading || !service || !time) return;
+    setDraftRestored(false);
+    if (slots.includes(time)) return;
+    setTime("");
+    setStep("time");
+    setSlotLostNotice(true);
+  }, [draftRestored, busyLoading, service, time, slots]);
 
   const availFor = useCallback(
     (ds: string) => {
@@ -407,13 +492,16 @@ export function BookingWizard({
     setConfirmationCode(inserted.id.replace(/-/g, "").slice(0, 6).toUpperCase());
 
     releaseHold();
+    // The booking exists now, so there's nothing left to resume
+    clearDraft();
     setLoading(false);
     setDone(true);
     router.refresh();
   }
 
   function restart() {
-    setStep("forWho");
+    clearDraft();
+    setStep("service");
     setForGuest(false);
     setRelationship(null);
     setGuestName("");
@@ -421,8 +509,10 @@ export function BookingWizard({
     setCart({});
     setChosenProducts(new Set());
     setTime("");
+    setMaxReached(0);
     setDone(false);
     setError(null);
+    setSlotLostNotice(false);
   }
 
   // ── Done screen ──────────────────────────────────────────────────────────
@@ -935,6 +1025,29 @@ export function BookingWizard({
             title={t("booking.selectTime")}
             hint={format(new Date(date + "T00:00:00"), "EEEE d MMMM", { locale })}
           />
+
+          {/* The slot they had picked before leaving was taken meanwhile */}
+          {slotLostNotice && (
+            <div className="bg-warning-light border border-warning/25 rounded-2xl px-3.5 py-3 flex gap-2.5">
+              <Clock size={16} className="text-warning shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-warning">
+                  Esa hora ya fue reservada
+                </p>
+                <p className="text-xs text-muted mt-0.5">
+                  Alguien la tomó mientras no estabas. Elige otra hora disponible; el
+                  resto de tu reserva se conservó.
+                </p>
+              </div>
+              <button
+                onClick={() => setSlotLostNotice(false)}
+                aria-label="Cerrar aviso"
+                className="text-muted shrink-0 self-start"
+              >
+                <Plus size={16} className="rotate-45" />
+              </button>
+            </div>
+          )}
 
           {holdError && (
             <p className="text-xs text-danger text-center bg-danger-light rounded-xl py-2">

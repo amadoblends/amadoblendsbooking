@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Playfair_Display, Geist_Mono } from "next/font/google";
 import { SwRegister } from "@/components/pwa/sw-register";
+import { NativeShell } from "@/components/native-shell";
 import "./globals.css";
 
 // Same pairing as the barber app so both share one identity
@@ -59,6 +60,7 @@ export default function RootLayout({
     >
       <body className="h-full bg-background text-foreground">
         <SwRegister />
+        <NativeShell />
         {children}
       </body>
     </html>

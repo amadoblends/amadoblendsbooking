@@ -9,6 +9,8 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { QuickAccessGrid } from "@/components/home/quick-access-grid";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
+import { BusinessHeader } from "@/components/home/business-header";
+import { getBusiness } from "@/lib/data/business";
 import { getT } from "@/lib/session";
 
 export default async function HomePage() {
@@ -27,7 +29,9 @@ export default async function HomePage() {
 
   if (!client) redirect("/configurar-perfil");
 
-  const [{ data: nextApt }, { data: services }, { data: carouselPosts }] = await Promise.all([
+  const [business, { data: nextApt }, { data: services }, { data: carouselPosts }] =
+    await Promise.all([
+      getBusiness(),
     supabase
       .from("appointments")
       .select("id, starts_at, status, services(name)")
@@ -49,32 +53,27 @@ export default async function HomePage() {
       .from("carousel_posts")
       .select("id, title, description, image_url, type, button_label, button_href")
       .order("sort_order"),
-  ]);
+    ]);
 
   const firstName = client.full_name.split(" ")[0];
   const { t, lang } = await getT();
 
   return (
     <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-6">
-      <RealtimeRefresher tables={["services", "appointments", "carousel_posts"]} />
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center">
-            <span className="text-white font-black text-lg leading-none">A</span>
-          </div>
-          <span className="font-bold tracking-[0.18em] text-sm text-foreground">
-            AMADOBLENDS
-          </span>
-        </div>
+      <RealtimeRefresher
+        tables={["services", "appointments", "carousel_posts", "business_settings"]}
+      />
+
+      {/* The shop's own identity leads the screen */}
+      <BusinessHeader business={business}>
         <NotificationBell clientId={client.id} />
-      </header>
+      </BusinessHeader>
 
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h2 className="text-xl font-bold text-foreground">
           {t("home.greeting")}, {firstName}! 👋
-        </h1>
+        </h2>
         <p className="text-sm text-muted mt-0.5">{t("home.subtitle")}</p>
       </div>
 

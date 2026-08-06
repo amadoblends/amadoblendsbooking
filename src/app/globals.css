@@ -49,9 +49,31 @@
   --font-mono: var(--font-mono-app);
 }
 
+/*
+ * Native feel: no long-press text selection, no iOS callout bubble, no image
+ * drag. Anything the client can actually edit opts back in below.
+ */
 * {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"],
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
+img,
+a {
+  -webkit-user-drag: none;
 }
 
 /* iOS zooms into inputs with font-size < 16px; keep them at 16px on touch screens */
