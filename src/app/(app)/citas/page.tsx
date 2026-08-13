@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Calendar, Clock, UserPlus } from "lucide-react";
+// Times must read the same here as on the barber's calendar — see lib/timezone
+import { shopTime, shopShortDate } from "@/lib/timezone";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
@@ -110,11 +110,7 @@ export default async function MisCitasPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-foreground">{svc.name}</p>
                     <p className="text-sm text-muted capitalize">
-                      {format(new Date(a.starts_at), "EEEE d MMM", { locale: es })} ·{" "}
-                      {new Date(a.starts_at).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                      {shopShortDate(a.starts_at)} · {shopTime(a.starts_at)}
                     </p>
                     {a.guest_name && (
                       <p className="text-xs text-brand font-semibold flex items-center gap-1 mt-0.5">

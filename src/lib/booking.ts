@@ -1,4 +1,5 @@
 import { addMinutes, isBefore } from "date-fns";
+import { shopDateAt } from "@/lib/timezone";
 
 export interface AvailDay {
   weekday: number;
@@ -33,10 +34,15 @@ export function fmtSlot(hhmm: string) {
   return `${dh}:${String(m).padStart(2, "0")} ${p}`;
 }
 
-/** Builds a local Date from a "yyyy-MM-dd" string plus minutes past midnight. */
+/**
+ * The instant matching a slot's wall-clock time **at the shop**.
+ *
+ * This used to be `new Date(y, m, d, h, mi)`, which reads the *client's*
+ * device timezone — so the same 9:00 AM slot stored a different instant for a
+ * client booking from another state than for one booking in the shop.
+ */
 export function slotToDate(dateStr: string, mins: number) {
-  const [y, mo, d] = dateStr.split("-").map(Number);
-  return new Date(y, mo - 1, d, Math.floor(mins / 60), mins % 60, 0);
+  return shopDateAt(dateStr, fromMins(mins));
 }
 
 export interface SlotOptions {

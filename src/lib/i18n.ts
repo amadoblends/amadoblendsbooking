@@ -85,6 +85,14 @@ const dict = {
     es: "Tu reserva temporal expiró. Elige una hora de nuevo.",
     en: "Your temporary hold expired. Please pick a time again.",
   },
+  "booking.sessionExpired": {
+    es: "Tu sesión de reserva expiró",
+    en: "Your booking session expired",
+  },
+  "booking.sessionExpiredHint": {
+    es: "Liberamos esa hora para que otra persona pudiera tomarla. Vuelve a elegir fecha y hora.",
+    en: "We released that slot so someone else could take it. Please select a new date and time.",
+  },
   "booking.slotTaken": {
     es: "Ese horario acaba de ocuparse. Elige otro.",
     en: "That slot was just taken. Please choose another.",

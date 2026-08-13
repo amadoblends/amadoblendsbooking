@@ -27,9 +27,14 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  /*
+   * getClaims() verifies the JWT locally against the project's cached JWKS,
+   * where getUser() calls /auth/v1/user over the network. Middleware runs on
+   * *every* request, so that round trip was being paid constantly just to
+   * answer "is this person signed in?".
+   */
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims ? { id: claims.claims.sub } : null;
 
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));

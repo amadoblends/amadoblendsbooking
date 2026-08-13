@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Clock, Scissors } from "lucide-react";
+// Times must read the same here as on the barber's calendar — see lib/timezone
+import { shopTime, shopShortDate } from "@/lib/timezone";
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -94,12 +94,8 @@ export default async function HomePage() {
               {t("home.nextAppointment")}
             </p>
             <p className="text-sm font-semibold text-foreground capitalize truncate">
-              {format(new Date(nextApt.starts_at), "EEE d MMM", { locale: es })} ·{" "}
-              {new Date(nextApt.starts_at).toLocaleTimeString([], {
-                hour: "numeric",
-                minute: "2-digit",
-              })}{" "}
-              · {(nextApt.services as unknown as { name: string }).name}
+              {shopShortDate(nextApt.starts_at)} · {shopTime(nextApt.starts_at)} ·{" "}
+              {(nextApt.services as unknown as { name: string }).name}
             </p>
           </div>
         </Link>

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronDown, ChevronRight, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { shopTime, shopDateStr } from "@/lib/timezone";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { relationshipLabel } from "@/lib/booking";
 
@@ -37,14 +38,12 @@ interface YearGroup {
   months: MonthGroup[];
 }
 
+/** Buckets by the shop's calendar day, so evening visits stay on their date. */
 function localKey(iso: string, part: "year" | "month" | "day") {
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  if (part === "year") return String(y);
-  if (part === "month") return `${y}-${m}`;
-  return `${y}-${m}-${day}`;
+  const key = shopDateStr(iso); // yyyy-MM-dd
+  if (part === "year") return key.slice(0, 4);
+  if (part === "month") return key.slice(0, 7);
+  return key;
 }
 
 export function GroupedHistory({ appointments }: { appointments: HistoryAppointment[] }) {
@@ -209,10 +208,7 @@ export function GroupedHistory({ appointments }: { appointments: HistoryAppointm
                                             {a.serviceName}
                                           </p>
                                           <p className="text-xs text-muted">
-                                            {new Date(a.starts_at).toLocaleTimeString([], {
-                                              hour: "numeric",
-                                              minute: "2-digit",
-                                            })}
+                                            {shopTime(a.starts_at)}
                                             {" · "}${a.price.toFixed(2)}
                                           </p>
                                           {a.guestName && (

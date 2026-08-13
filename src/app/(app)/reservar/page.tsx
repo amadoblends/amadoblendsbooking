@@ -1,3 +1,4 @@
+import { shopToday } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BookingWizard, type WizardServiceProduct } from "@/components/booking/booking-wizard";
@@ -23,6 +24,9 @@ export default async function ReservarPage({
     .maybeSingle();
 
   if (!client) redirect("/configurar-perfil");
+
+  // The shop's today, not the server's — see lib/timezone
+  const todayISO = shopToday();
 
   const [
     { data: services },
@@ -51,16 +55,22 @@ export default async function ReservarPage({
       .eq("is_visible_for_sale", true)
       .order("name"),
     supabase
+      // Only promotions running today. RLS enforces the same window (see
+      // migration 22); the explicit filter keeps the intent visible here.
       .from("promotions")
-      .select("id, title, discount_percent, service_id, weekdays, start_time, end_time, ends_on")
-      .eq("is_active", true),
+      .select(
+        "id, title, discount_percent, service_id, weekdays, start_time, end_time, starts_on, ends_on"
+      )
+      .eq("is_active", true)
+      .or(`starts_on.is.null,starts_on.lte.${todayISO}`)
+      .or(`ends_on.is.null,ends_on.gte.${todayISO}`),
   ]);
 
   // Closures explain why a day is unavailable instead of just greying it out
   const { data: closures } = await supabase
     .from("closures")
     .select("id, starts_on, ends_on, reason, description")
-    .gte("ends_on", new Date().toISOString().slice(0, 10))
+    .gte("ends_on", todayISO)
     .order("starts_on");
 
   // Combo contents + the products each service offers during the visit

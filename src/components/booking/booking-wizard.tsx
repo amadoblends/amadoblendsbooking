@@ -27,6 +27,7 @@ import {
   type ClientClosure,
 } from "./closure-notice";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/booking-draft";
+import { shopToday } from "@/lib/timezone";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ export interface WizardPromotion {
   weekdays: number[];
   start_time: string | null;
   end_time: string | null;
+  starts_on?: string | null;
   ends_on: string | null;
 }
 
@@ -83,10 +85,18 @@ function discountFor(
   const weekday = new Date(y, mo - 1, d).getDay();
   const slotMins = time ? toMins(time) : null;
 
+  const today = shopToday();
+
   let best = 0;
   for (const p of promotions) {
     if (p.service_id && p.service_id !== service.id) continue;
     if (!p.weekdays.includes(weekday)) continue;
+    // The promotion has to be running *now* and still cover the booked day.
+    // The old check looked only at ends_on vs the booking date, so a campaign
+    // that hadn't started yet already discounted, and an expired one kept
+    // discounting bookings made before its end date.
+    if (p.starts_on && today < p.starts_on) continue;
+    if (p.ends_on && today > p.ends_on) continue;
     if (p.ends_on && dateStr > p.ends_on) continue;
     if (p.start_time && p.end_time && slotMins !== null) {
       const s = toMins(String(p.start_time).slice(0, 5));
@@ -172,6 +182,8 @@ export function BookingWizard({
   const [openClosure, setOpenClosure] = useState<ClientClosure | null>(null);
   // Shown when a restored booking's chosen time was taken while they were away
   const [slotLostNotice, setSlotLostNotice] = useState(false);
+  // The 60-second hold ran out while they were on the summary step
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
   const today = startOfDay(new Date());
@@ -402,11 +414,19 @@ export function BookingWizard({
       const left = Math.max(0, Math.ceil((holdExpiresAt - Date.now()) / 1000));
       setHoldLeft(left);
       if (left === 0) {
+        /*
+         * The hold is gone, so the chosen time is no longer theirs. Send them
+         * back to the Date step rather than leaving them staring at a list of
+         * times where one is still highlighted — from there they re-pick the
+         * day and hour deliberately, against fresh availability.
+         */
         setHoldExpiresAt(null);
         setTime("");
-        setHoldError(t("booking.holdExpired"));
+        releaseRef.current();
+        setSessionExpired(true);
+        setHoldError(null);
         setBusyVersion((v) => v + 1);
-        setStep("time");
+        setStep("date");
       }
     };
     tick();
@@ -911,6 +931,26 @@ export function BookingWizard({
       {step === "date" && (
         <div className="space-y-3">
           <StepTitle title={t("booking.pickDate")} hint={t("booking.capacityHint")} />
+
+          {/* The hold ran out, so the time they had is released */}
+          {sessionExpired && (
+            <div className="bg-warning-light border border-warning/25 rounded-2xl px-3.5 py-3 flex gap-2.5">
+              <Timer size={16} className="text-warning shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-warning">{t("booking.sessionExpired")}</p>
+                <p className="text-xs text-muted mt-0.5">
+                  {t("booking.sessionExpiredHint")}
+                </p>
+              </div>
+              <button
+                onClick={() => setSessionExpired(false)}
+                aria-label="Cerrar aviso"
+                className="text-muted shrink-0 self-start"
+              >
+                <Plus size={16} className="rotate-45" />
+              </button>
+            </div>
+          )}
 
           <div className="bg-surface rounded-2xl border border-border p-4">
             <div className="flex items-center justify-between mb-3">

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+// Times must read the same here as on the barber's calendar — see lib/timezone
+import { shopTime, shopTimeRange, shopLongDate } from "@/lib/timezone";
 import { Calendar, Clock, Scissors, DollarSign, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import { BackButton } from "@/components/ui/back-button";
@@ -83,12 +83,12 @@ export default async function CitaDetailPage({
       {/* Details card */}
       <div className="bg-surface rounded-2xl border border-border overflow-hidden divide-y divide-border">
         <DetailRow icon={<Calendar size={16} className="text-muted" />} label="Fecha">
-          <span className="capitalize">
-            {format(startsAt, "EEEE d 'de' MMMM yyyy", { locale: es })}
-          </span>
+          <span className="capitalize">{shopLongDate(apt.starts_at)}</span>
         </DetailRow>
         <DetailRow icon={<Clock size={16} className="text-muted" />} label="Hora">
-          {startsAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          {apt.ends_at
+            ? shopTimeRange(apt.starts_at, apt.ends_at)
+            : shopTime(apt.starts_at)}
         </DetailRow>
         <DetailRow icon={<Scissors size={16} className="text-muted" />} label="Servicio">
           {svc.name}
