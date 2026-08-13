@@ -64,7 +64,7 @@ export default async function MisCitasPage() {
   });
 
   return (
-    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
+    <div className="px-4 pt-[max(12px,var(--safe-top))] pb-4 space-y-5">
       <RealtimeRefresher tables={["appointments"]} />
       <header className="flex items-center gap-3">
         <BackButton />

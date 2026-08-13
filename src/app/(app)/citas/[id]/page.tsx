@@ -61,7 +61,7 @@ export default async function CitaDetailPage({
     apt.status !== "cancelada" && apt.status !== "completada" && startsAt > new Date();
 
   return (
-    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-6 space-y-5">
+    <div className="px-4 pt-[max(12px,var(--safe-top))] pb-6 space-y-5">
       <RealtimeRefresher tables={["appointments"]} />
       <header className="flex items-center gap-3">
         <BackButton />

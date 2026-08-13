@@ -130,7 +130,7 @@ export default async function ReservarPage({
     .maybeSingle();
 
   return (
-    <div className="px-5 pt-[max(20px,var(--safe-top))] pb-[max(28px,var(--safe-bottom))]">
+    <div className="px-5 pt-[max(12px,var(--safe-top))] pb-[max(28px,var(--safe-bottom))]">
       <RealtimeRefresher tables={["services", "promotions", "products", "service_products"]} />
 
       <BookingWizard

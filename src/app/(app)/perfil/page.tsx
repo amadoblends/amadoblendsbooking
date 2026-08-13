@@ -44,7 +44,7 @@ export default async function PerfilPage() {
   const { t } = await getT();
 
   return (
-    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-5">
+    <div className="px-4 pt-[max(12px,var(--safe-top))] pb-4 space-y-5">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <BackButton />

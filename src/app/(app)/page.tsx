@@ -48,10 +48,16 @@ export default async function HomePage() {
       .eq("is_public", true)
       .order("price", { ascending: true })
       .limit(4),
-    // RLS already filters to posts that are active and within their dates
+    /*
+     * RLS keeps drafts, paused and finished posts out (migration 23), but the
+     * window fields come along so the carousel can re-check the clock while
+     * the app stays open — expiry is a clock event, not a database change.
+     */
     supabase
       .from("carousel_posts")
-      .select("id, title, description, image_url, type, button_label, button_href")
+      .select(
+        "id, title, description, image_url, type, button_label, button_href, is_active, is_draft, is_permanent, starts_at, ends_at"
+      )
       .order("sort_order"),
     ]);
 
@@ -59,7 +65,7 @@ export default async function HomePage() {
   const { t, lang } = await getT();
 
   return (
-    <div className="px-4 pt-[max(20px,var(--safe-top))] pb-4 space-y-6">
+    <div className="px-4 pt-[max(12px,var(--safe-top))] pb-4 space-y-5">
       <RealtimeRefresher
         tables={["services", "appointments", "carousel_posts", "business_settings"]}
       />

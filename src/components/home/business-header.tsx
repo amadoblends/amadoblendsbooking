@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { MapPin, Phone, AtSign, Store } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Business } from "@/lib/data/business";
 
 /**
@@ -21,31 +22,35 @@ export function BusinessHeader({
 
   return (
     <section className="-mx-4 -mt-[max(20px,var(--safe-top))]">
-      {/* Cover */}
-      <div className="relative w-full aspect-[16/9] max-h-[210px] bg-surface">
+      {/*
+        * With a cover photo this is a proper masthead. Without one it
+        * collapses to just enough height to clear the Dynamic Island and hold
+        * the bell — reserving a 16:9 block of empty gradient wasted a third of
+        * the screen on phones that had no cover set.
+        */}
+      <div
+        className={cn(
+          "relative w-full bg-surface",
+          cover_url ? "aspect-[16/9] max-h-[200px]" : "h-[calc(var(--safe-top)+56px)]"
+        )}
+      >
         {cover_url ? (
-          <Image
-            src={cover_url}
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
+          <>
+            <Image src={cover_url} alt="" fill priority sizes="100vw" className="object-cover" />
+            {/* Keeps the logo and name legible over any photo */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-transparent" />
+          </>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-brand/25 via-surface to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-brand/12 to-background" />
         )}
 
-        {/* Keeps the logo and name legible over any photo */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-transparent" />
-
         {children && (
-          <div className="absolute top-[max(16px,var(--safe-top))] right-4">{children}</div>
+          <div className="absolute top-[max(12px,var(--safe-top))] right-4">{children}</div>
         )}
       </div>
 
       {/* Identity */}
-      <div className="px-4 -mt-9 relative">
+      <div className={cn("px-4 relative", cover_url ? "-mt-9" : "-mt-6")}>
         <div className="flex items-end gap-3">
           <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden relative shrink-0 bg-surface ring-4 ring-background flex items-center justify-center">
             {logo_url ? (

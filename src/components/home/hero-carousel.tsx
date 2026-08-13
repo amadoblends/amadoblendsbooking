@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { visiblePosts, nextTransitionAt } from "@/lib/carousel-status";
 
 export interface CarouselPost {
   id: string;
@@ -14,6 +15,12 @@ export interface CarouselPost {
   type: string;
   button_label: string | null;
   button_href: string | null;
+  // The publication window, evaluated live — see lib/carousel-status
+  is_active: boolean;
+  is_draft: boolean | null;
+  is_permanent: boolean | null;
+  starts_at: string | null;
+  ends_at: string | null;
 }
 
 const TYPE_META: Record<string, { label: string; labelEn: string; emoji: string }> = {
@@ -40,8 +47,43 @@ export function HeroCarousel({
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
 
-  const slides = posts.length > 0 ? posts : [FALLBACK];
+  /*
+   * Expiry is a clock event, not a database change, so realtime never fires
+   * for it. `now` advances at exactly the moment the soonest post starts or
+   * ends, which re-runs the filter below and drops the finished slide without
+   * a refresh, a re-login or any action from the client.
+   */
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const next = nextTransitionAt(posts, now);
+    if (next === null) return;
+    // A second of slack so the boundary is safely behind us when we re-check
+    const id = setTimeout(() => setNow(Date.now()), Math.max(next - Date.now() + 1000, 1000));
+    return () => clearTimeout(id);
+  }, [posts, now]);
+
+  // Coming back to a backgrounded tab must not show a stale window either
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") setNow(Date.now());
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  /*
+   * Live content wins; permanent brand content fills in when nothing is
+   * running. A finished promotion is never a fallback.
+   */
+  const visible = useMemo(() => visiblePosts(posts, now), [posts, now]);
+  const slides = visible.length > 0 ? visible : [FALLBACK];
   const count = slides.length;
+
+  // A shrinking list must not leave the dots pointing past the end
+  useEffect(() => {
+    setIndex((i) => (i < count ? i : 0));
+  }, [count]);
 
   const scrollTo = useCallback((i: number) => {
     const track = trackRef.current;
@@ -166,7 +208,7 @@ function Slide({ post, lang }: { post: CarouselPost; lang: "es" | "en" }) {
   return body;
 }
 
-// Shown when the barber hasn't published anything yet
+// Last resort: nothing live and no permanent content configured either
 const FALLBACK: CarouselPost = {
   id: "fallback",
   title: "Tu mejor versión comienza aquí",
@@ -175,4 +217,9 @@ const FALLBACK: CarouselPost = {
   type: "info",
   button_label: null,
   button_href: null,
+  is_active: true,
+  is_draft: false,
+  is_permanent: true,
+  starts_at: null,
+  ends_at: null,
 };
