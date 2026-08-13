@@ -36,12 +36,15 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(params.get("error"));
   const [notice, setNotice] = useState<string | null>(null);
+  // Set when someone tries to register with an address that already has an account
+  const [existingEmail, setExistingEmail] = useState<string | null>(null);
 
   function switchMode(next: Mode) {
     setMode(next);
     setStep("form");
     setError(null);
     setNotice(null);
+    setExistingEmail(null);
     setOtp("");
   }
 
@@ -101,6 +104,23 @@ function LoginPageInner() {
     setError(null);
 
     const supabase = createClient();
+
+    /*
+     * Supabase intentionally never says whether an email is taken — with
+     * shouldCreateUser:true it just signs the person into the account that
+     * already existed, which looks like a broken registration. Ask first so
+     * we can send them to the login tab instead.
+     */
+    const { data: taken, error: checkError } = await supabase.rpc("email_has_account", {
+      p_email: email,
+    });
+
+    if (!checkError && taken === true) {
+      setExistingEmail(email);
+      setLoading(false);
+      return;
+    }
+
     // Creates the auth user only once the code is verified
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -246,6 +266,16 @@ function LoginPageInner() {
           >
             ¿No recibiste el código? Reenviar
           </button>
+
+          {/*
+            * If the Supabase Magic Link template has no {{ .Token }}, the
+            * email arrives as a "Sign in" link with no digits in it. Nothing
+            * in the code can detect that, so say it plainly — otherwise the
+            * screen just looks broken. See supabase/CONFIGURACION.md.
+            */}
+          <p className="text-[11px] text-muted/70 text-center leading-relaxed pt-1">
+            Si el correo trae un enlace en vez de 6 dígitos, tócalo para entrar.
+          </p>
         </form>
       </Shell>
     );
@@ -303,6 +333,41 @@ function LoginPageInner() {
 
         <Field icon={<Mail size={15} />} type="email" placeholder="Correo electrónico" value={email} onChange={setEmail} />
         <PasswordField value={password} onChange={setPassword} />
+
+        {/* Already registered — offer the way forward rather than a dead end */}
+        {existingEmail && (
+          <div className="bg-warning-light border border-warning/25 rounded-xl p-3.5 space-y-2.5">
+            <p className="text-sm font-bold text-warning">Ese correo ya tiene cuenta</p>
+            <p className="text-xs text-muted leading-relaxed">
+              <span className="text-foreground font-medium">{existingEmail}</span> ya está
+              registrado en Amado Blends. Inicia sesión con tu contraseña, o entra con Google si
+              así creaste la cuenta.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setExistingEmail(null);
+                  setMode("login");
+                  setError(null);
+                }}
+                className="flex-1 h-10 rounded-xl bg-brand text-white text-xs font-bold"
+              >
+                Iniciar sesión
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExistingEmail(null);
+                  setEmail("");
+                }}
+                className="flex-1 h-10 rounded-xl border border-border text-xs font-semibold text-foreground"
+              >
+                Usar otro correo
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-xs text-danger text-center">{error}</p>}
 

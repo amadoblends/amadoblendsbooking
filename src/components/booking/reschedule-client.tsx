@@ -10,6 +10,8 @@ import {
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Loader2, CalendarClock, Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { shopDateAt } from "@/lib/timezone";
+import { notifyBookingRescheduled } from "@/lib/actions/notify";
 import { cn } from "@/lib/utils";
 
 const WEEK_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
@@ -135,9 +137,8 @@ export function RescheduleClient({
     setError(null);
 
     const supabase = createClient();
-    const [y, mo, d] = date.split("-").map(Number);
-    const [h, mi] = time.split(":").map(Number);
-    const startsAt = new Date(y, mo - 1, d, h, mi, 0);
+    // The shop's wall clock, not this device's — see lib/timezone
+    const startsAt = shopDateAt(date, time);
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
 
     const { error: updateError } = await supabase
@@ -161,6 +162,8 @@ export function RescheduleClient({
 
     setDone(true);
     setLoading(false);
+    // Both sides get the new time; a mail failure can't undo the change
+    notifyBookingRescheduled(appointmentId, currentStartsAt).catch(() => {});
     router.refresh();
   }
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { notifyBookingCancelled } from "@/lib/actions/notify";
 
 export function CancelButton({ appointmentId }: { appointmentId: string }) {
   const router = useRouter();
@@ -15,6 +16,12 @@ export function CancelButton({ appointmentId }: { appointmentId: string }) {
     setLoading(true);
     setError(null);
     const supabase = createClient();
+
+    /*
+     * The email needs the appointment's details, and cancelling doesn't erase
+     * them — but reading them before the update keeps the notice accurate even
+     * if a later change touches the row.
+     */
     const { error } = await supabase
       .from("appointments")
       .update({ status: "cancelada" })
@@ -23,10 +30,13 @@ export function CancelButton({ appointmentId }: { appointmentId: string }) {
     if (error) {
       setError("No se pudo cancelar. Intenta de nuevo.");
       setLoading(false);
-    } else {
-      router.push("/citas");
-      router.refresh();
+      return;
     }
+
+    // Tell both sides; never let a mail failure block the redirect
+    notifyBookingCancelled(appointmentId).catch(() => {});
+    router.push("/citas");
+    router.refresh();
   }
 
   if (confirming) {

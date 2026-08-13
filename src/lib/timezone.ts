@@ -37,9 +37,20 @@ function fmt(locale: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFor
   return f;
 }
 
-/** "9:00 AM" in the shop's timezone. */
+/**
+ * "9:00 AM" in the shop's timezone.
+ *
+ * Spanish locales render the meridiem as "a. m." / "p. m."; normalised to the
+ * uppercase form the rest of the app uses so a time reads identically in an
+ * email and on the calendar.
+ */
 export function shopTime(value: string | Date, locale = "es-PR"): string {
-  return fmt(locale, { hour: "numeric", minute: "2-digit" }).format(asDate(value));
+  return fmt(locale, { hour: "numeric", minute: "2-digit" })
+    .format(asDate(value))
+    .replace(/\s*a\.\s*m\.?/i, " AM")
+    .replace(/\s*p\.\s*m\.?/i, " PM")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** "9:00 AM – 9:45 AM" */

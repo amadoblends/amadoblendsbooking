@@ -28,6 +28,7 @@ import {
 } from "./closure-notice";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/booking-draft";
 import { shopToday } from "@/lib/timezone";
+import { notifyBookingCreated } from "@/lib/actions/notify";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -516,6 +517,14 @@ export function BookingWizard({
     clearDraft();
     setLoading(false);
     setDone(true);
+
+    /*
+     * Confirmation emails and the barber's notification go out after the
+     * screen has already switched. The booking is committed either way, so a
+     * slow or misconfigured mail provider must never make the client wait or
+     * think it failed.
+     */
+    notifyBookingCreated(inserted.id).catch(() => {});
     router.refresh();
   }
 
