@@ -113,21 +113,35 @@ Variables:
 |---|---|---|
 | `RESEND_API_KEY` | `re_...` | la clave del paso (c) |
 | `EMAIL_FROM` | `Amado Blends <citas@tudominio.com>` | remitente |
-| `BARBER_NOTIFY_EMAIL` | tu correo personal | dónde te avisan a ti |
 | `NEXT_PUBLIC_SHOP_TIMEZONE` | `America/Puerto_Rico` | la hora de la barbería |
+| `BARBER_NOTIFY_EMAIL` | *(opcional)* | respaldo, ver abajo |
 
+Ponlas en **los dos proyectos** de Vercel: el panel manda correos cuando tú
+creas o mueves una cita, y la app del cliente cuando reserva un cliente.
 Vuelve a desplegar después de guardarlas.
+
+**¿A qué correo te llegan a ti?** Se resuelve en este orden:
+
+1. **Panel → Negocio → "Correo para notificaciones"** ← usa este. Se cambia
+   sin redesplegar y puede ser tu Gmail o el de la compañía.
+2. `BARBER_NOTIFY_EMAIL`, si dejaste ese campo vacío.
+3. El correo con el que inicias sesión, como último recurso.
 
 **Qué se envía y a quién:**
 
-| Cuándo | Al cliente | A ti |
+| Qué pasa | Al cliente | A ti |
 |---|---|---|
-| Reserva nueva | Confirmación con todos los datos | Aviso de cita nueva |
-| Cancelación | Confirmación de cancelación | Aviso, con la hora que se liberó |
-| Reprogramación | Hora nueva, con la anterior de referencia | Igual |
+| Un cliente reserva desde su app | Confirmación completa | Aviso de cita nueva |
+| **Tú creas una cita en el panel** | Confirmación completa | Tu copia |
+| Un cliente cancela | Confirmación de cancelación | Aviso, con la hora liberada |
+| **Tú cancelas desde el panel** | Aviso de cancelación | Tu copia |
+| Un cliente reprograma | Hora nueva, con la anterior | Igual |
+| **Tú mueves una cita** | Hora nueva, con la anterior | Tu copia |
+| **Marcas "No asistió"** | — *(a propósito)* | Solo para tu registro |
 
 Cada correo lleva servicio, fecha, hora, duración, barbero, productos,
-dirección con enlace a mapas, notas, total y código de confirmación.
+dirección con enlace a mapas, notas, total y código de confirmación. El aviso
+que te llega a ti responde directo al cliente si le das a *Responder*.
 
 > Mientras falten `RESEND_API_KEY` o `EMAIL_FROM`, la app funciona igual: no
 > manda correos y no falla ninguna reserva. Tu campanita dentro de la app
@@ -149,6 +163,7 @@ migration_21_business_identity.sql
 migration_22_promotions_window.sql
 migration_23_carousel_window.sql
 migration_24_email_exists.sql        ← "ese correo ya tiene cuenta"
+migration_25_notify_email.sql        ← el correo que recibe los avisos
 ```
 
 Hasta la 23, el aviso de vacaciones terminado seguirá en el carrusel. Hasta la

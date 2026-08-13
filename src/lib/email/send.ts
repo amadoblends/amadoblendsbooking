@@ -37,11 +37,6 @@ export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 }
 
-/** The shop owner's inbox, for "you have a new booking" notices. */
-export function barberInbox(): string | null {
-  return process.env.BARBER_NOTIFY_EMAIL?.trim() || null;
-}
-
 export async function sendMail(mail: Mail): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;

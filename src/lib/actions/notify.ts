@@ -1,7 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { sendAll, barberInbox, emailConfigured } from "@/lib/email/send";
+import { sendAll, emailConfigured } from "@/lib/email/send";
+import { resolveBarberInbox } from "@/lib/email/recipients";
 import {
   clientBookingConfirmed,
   barberNewBooking,
@@ -123,7 +124,7 @@ export async function notifyBookingCreated(appointmentId: string): Promise<void>
 
   if (!emailConfigured()) return;
 
-  const barberTo = barberInbox();
+  const barberTo = await resolveBarberInbox(await createClient());
   const mails = [];
 
   if (clientEmail) {
@@ -158,7 +159,7 @@ export async function notifyBookingCancelled(appointmentId: string): Promise<voi
 
   if (!emailConfigured()) return;
 
-  const barberTo = barberInbox();
+  const barberTo = await resolveBarberInbox(await createClient());
   const mails = [];
 
   if (clientEmail) {
@@ -189,7 +190,7 @@ export async function notifyBookingRescheduled(
 
   if (!emailConfigured()) return;
 
-  const barberTo = barberInbox();
+  const barberTo = await resolveBarberInbox(await createClient());
   const mails = [];
 
   if (clientEmail) {
