@@ -10,11 +10,9 @@ import {
   bookingRescheduled,
   type AppointmentEmailData,
 } from "@/lib/email/templates";
-import { shopLongDate, shopTime } from "@/lib/timezone";
 
 /**
- * Everything that has to happen *around* a booking once it exists: the
- * barber's in-app notification, and the emails to both sides.
+ * The emails that go out around a booking the client made.
  *
  * Deliberately fire-and-forget from the caller's point of view. A booking is
  * real the moment its row is committed; nothing here is allowed to fail it.
@@ -98,29 +96,22 @@ async function loadAppointment(appointmentId: string): Promise<
   };
 }
 
-/** Row in the barber's notification bell. */
-async function notifyBarberInApp(title: string, body: string, appointmentId: string) {
-  const supabase = await createClient();
-  // The table belongs to the admin panel; a missing row must not break booking
-  await supabase
-    .from("notifications")
-    .insert({ title, body, type: "cita", read: false, appointment_id: appointmentId })
-    .then(
-      () => undefined,
-      () => undefined
-    );
-}
+/*
+ * The barber's bell is filled by a database trigger on `appointments`
+ * (migration 26), not from here.
+ *
+ * Doing it in application code failed silently for two reasons at once: the
+ * notifications table is admin-only under RLS, so a client's session could
+ * never insert into it, and the columns being written didn't exist. A trigger
+ * runs as the table owner and fires for every path — client booking, panel
+ * booking, or a hand-written SQL insert — so it can't be bypassed or
+ * forgotten.
+ */
 
 export async function notifyBookingCreated(appointmentId: string): Promise<void> {
   const loaded = await loadAppointment(appointmentId);
   if (!loaded) return;
   const { data, clientEmail } = loaded;
-
-  await notifyBarberInApp(
-    "Nueva cita",
-    `${data.clientName} · ${data.serviceName} · ${shopLongDate(data.startsAt)} ${shopTime(data.startsAt)}`,
-    appointmentId
-  );
 
   if (!emailConfigured()) return;
 
@@ -151,12 +142,6 @@ export async function notifyBookingCancelled(appointmentId: string): Promise<voi
   if (!loaded) return;
   const { data, clientEmail } = loaded;
 
-  await notifyBarberInApp(
-    "Cita cancelada",
-    `${data.clientName} · ${shopLongDate(data.startsAt)} ${shopTime(data.startsAt)}`,
-    appointmentId
-  );
-
   if (!emailConfigured()) return;
 
   const barberTo = await resolveBarberInbox(await createClient());
@@ -181,12 +166,6 @@ export async function notifyBookingRescheduled(
   const loaded = await loadAppointment(appointmentId);
   if (!loaded) return;
   const { data, clientEmail } = loaded;
-
-  await notifyBarberInApp(
-    "Cita reprogramada",
-    `${data.clientName} · ahora ${shopLongDate(data.startsAt)} ${shopTime(data.startsAt)}`,
-    appointmentId
-  );
 
   if (!emailConfigured()) return;
 

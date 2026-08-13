@@ -164,8 +164,10 @@ migration_22_promotions_window.sql
 migration_23_carousel_window.sql
 migration_24_email_exists.sql        ← "ese correo ya tiene cuenta"
 migration_25_notify_email.sql        ← el correo que recibe los avisos
+migration_26_appointment_notifications.sql  ← la campanita (¡esta primero!)
 ```
 
 Hasta la 23, el aviso de vacaciones terminado seguirá en el carrusel. Hasta la
 24, registrarse con un correo ya usado seguirá entrando a la cuenta vieja sin
-avisar.
+avisar. **Hasta la 26, la campanita no se llena cuando un cliente reserva** —
+esa es la que quieres correr primero.
