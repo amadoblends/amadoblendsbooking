@@ -24,6 +24,14 @@ export interface SendResult {
   skipped?: boolean;
 }
 
+export interface Attachment {
+  filename: string;
+  /** Base64 payload. */
+  content: string;
+  /** e.g. "text/calendar; method=REQUEST" — mail clients act on this. */
+  contentType?: string;
+}
+
 export interface Mail {
   to: string | string[];
   subject: string;
@@ -31,6 +39,8 @@ export interface Mail {
   /** Plain-text fallback for clients that refuse HTML. */
   text?: string;
   replyTo?: string;
+  /** Calendar invitations ride along here. */
+  attachments?: Attachment[];
 }
 
 export function emailConfigured(): boolean {
@@ -68,6 +78,11 @@ export async function sendMail(mail: Mail): Promise<SendResult> {
         html: mail.html,
         text: mail.text,
         reply_to: mail.replyTo,
+        attachments: mail.attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          content_type: a.contentType,
+        })),
       }),
       // A slow mail provider must not hold up the response to the client
       signal: AbortSignal.timeout(8000),

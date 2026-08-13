@@ -72,6 +72,41 @@ function button(href: string, label: string): string {
 }
 
 /**
+ * Structured data Gmail reads to draw its own summary card above the message —
+ * the panel with the date, time and location that a Google Calendar invite
+ * gets. Purely additive: clients that don't understand it just ignore the
+ * script tag.
+ *
+ * https://developers.google.com/gmail/markup — Reservation / EventReservation
+ */
+function gmailMarkup(d: AppointmentEmailData, cancelled: boolean): string {
+  const payload = {
+    "@context": "http://schema.org",
+    "@type": "EventReservation",
+    reservationNumber: d.confirmationCode ?? undefined,
+    reservationStatus: cancelled
+      ? "http://schema.org/ReservationCancelled"
+      : "http://schema.org/ReservationConfirmed",
+    underName: { "@type": "Person", name: d.guestName ?? d.clientName },
+    reservationFor: {
+      "@type": "Event",
+      name: `${d.serviceName} · ${d.shopName ?? "Amado Blends"}`,
+      startDate: new Date(d.startsAt).toISOString(),
+      endDate: new Date(d.endsAt).toISOString(),
+      location: {
+        "@type": "Place",
+        name: d.shopName ?? "Amado Blends",
+        address: d.shopAddress ?? undefined,
+      },
+    },
+  };
+
+  // </script> inside the JSON would end the block early
+  const json = JSON.stringify(payload).replace(/<\//g, "<\\/");
+  return `<script type="application/ld+json">${json}</script>`;
+}
+
+/**
  * The outer shell every message shares: header band, white card, footer.
  * `accent` tints the top rule so a cancellation reads differently from a
  * confirmation at a glance.
@@ -85,6 +120,8 @@ function shell(opts: {
   intro: string;
   body: string;
   footerNote?: string;
+  /** Gmail's summary card. */
+  markup?: string;
 }): string {
   const accent = opts.accent ?? BRAND;
   return `<!doctype html>
@@ -94,6 +131,7 @@ function shell(opts: {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>${esc(opts.title)}</title>
+${opts.markup ?? ""}
 </head>
 <body style="margin:0;padding:0;background:${PAPER};-webkit-font-smoothing:antialiased;">
   <!-- Preview line shown in the inbox list, hidden in the message itself -->
@@ -209,6 +247,7 @@ export function clientBookingConfirmed(d: AppointmentEmailData) {
     subject: `Cita confirmada · ${shopShort(d.startsAt)}, ${shopTime(d.startsAt)}`,
     html: shell({
       shopName,
+      markup: gmailMarkup(d, false),
       preheader: `${d.serviceName} · ${shopLongDate(d.startsAt)} a las ${shopTime(d.startsAt)}`,
       eyebrow: "Cita confirmada",
       title: `Nos vemos el ${shopLongDate(d.startsAt).replace(/^\w/, (c) => c.toLowerCase())}`,
@@ -233,6 +272,7 @@ export function barberNewBooking(d: AppointmentEmailData) {
     subject: `Nueva cita · ${d.clientName} · ${shopShort(d.startsAt)}, ${shopTime(d.startsAt)}`,
     html: shell({
       shopName,
+      markup: gmailMarkup(d, false),
       preheader: `${d.clientName} — ${d.serviceName} — ${shopTime(d.startsAt)}`,
       eyebrow: "Nueva cita",
       title: `${d.clientName} reservó ${d.serviceName}`,
@@ -253,6 +293,7 @@ export function bookingCancelled(d: AppointmentEmailData, opts: { forBarber: boo
       : `Tu cita del ${shopLongDate(d.startsAt)} fue cancelada`,
     html: shell({
       shopName,
+      markup: gmailMarkup(d, true),
       accent: "#dc2626",
       preheader: `${d.serviceName} · ${shopLongDate(d.startsAt)}`,
       eyebrow: "Cita cancelada",
@@ -282,6 +323,7 @@ export function bookingRescheduled(
       : `Tu cita se movió al ${shopLongDate(d.startsAt)}`,
     html: shell({
       shopName,
+      markup: gmailMarkup(d, false),
       accent: "#ca8a04",
       preheader: `Ahora ${shopLongDate(d.startsAt)} a las ${shopTime(d.startsAt)}`,
       eyebrow: "Cita reprogramada",
@@ -302,6 +344,7 @@ export function bookingReminder(d: AppointmentEmailData) {
     subject: `Recordatorio · tu cita es ${shopShort(d.startsAt)}, ${shopTime(d.startsAt)}`,
     html: shell({
       shopName,
+      markup: gmailMarkup(d, false),
       preheader: `${d.serviceName} a las ${shopTime(d.startsAt)}`,
       eyebrow: "Recordatorio",
       title: `${first}, tu cita es pronto`,
