@@ -85,6 +85,10 @@ const dict = {
     es: "Tu reserva temporal expiró. Elige una hora de nuevo.",
     en: "Your temporary hold expired. Please pick a time again.",
   },
+  "products.addsTime": {
+    es: "Estos productos añaden {min} min. Tu cita durará {total} min en total.",
+    en: "These products add {min} min. Your appointment will last {total} min in total.",
+  },
   "booking.sessionExpired": {
     es: "Tu sesión de reserva expiró",
     en: "Your booking session expired",

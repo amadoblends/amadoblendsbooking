@@ -28,6 +28,12 @@ import {
 } from "./closure-notice";
 import { saveDraft, loadDraft, clearDraft } from "@/lib/booking-draft";
 import { shopToday } from "@/lib/timezone";
+import {
+  extraMinutesFor,
+  categoryLabel,
+  categoryEmoji,
+  DEFAULT_CATEGORIES,
+} from "@/lib/product-categories";
 import { notifyBookingCreated } from "@/lib/actions/notify";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -36,7 +42,9 @@ export interface WizardServiceProduct {
   id: string;
   name: string;
   image_url: string | null;
-  category: "dry" | "wet" | null;
+  category: string | null;
+  /** Minutes this product adds to the appointment when chosen. */
+  extra_minutes?: number | null;
 }
 
 export interface WizardService {
@@ -207,6 +215,48 @@ export function BookingWizard({
 
   const availableUseProducts = service?.service_products ?? [];
 
+  /*
+   * Some products lengthen the visit — an enhancement adds four minutes, a
+   * colour ten. That has to be the duration everything downstream uses:
+   * which slots are offered, how far ahead the day fills, the hold, the
+   * appointment's end time and therefore overlap prevention. Showing it only
+   * on the confirmation would let two bookings collide.
+   *
+   * The service's own duration is never modified — this is per booking.
+   */
+  const extraMinutes = useMemo(
+    () => extraMinutesFor(availableUseProducts, chosenProducts),
+    [availableUseProducts, chosenProducts]
+  );
+  const effectiveDuration = (service?.duration_minutes ?? 0) + extraMinutes;
+
+  /** Products the service offers, bucketed by their category. */
+  const groupedUseProducts = useMemo(() => {
+    const map = new Map<string, WizardServiceProduct[]>();
+    for (const p of availableUseProducts) {
+      const key = p.category ?? "other";
+      const list = map.get(key) ?? [];
+      list.push(p);
+      map.set(key, list);
+    }
+    // Follow the catalogue's own order, with anything unknown last
+    const order = DEFAULT_CATEGORIES.map((c) => c.id);
+    return [...map.entries()].sort(
+      (a, b) =>
+        (order.indexOf(a[0]) === -1 ? 999 : order.indexOf(a[0])) -
+        (order.indexOf(b[0]) === -1 ? 999 : order.indexOf(b[0]))
+    );
+  }, [availableUseProducts]);
+
+  const toggleUseProduct = useCallback((id: string) => {
+    setChosenProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   // Shared slot rules from the barber's booking settings
   const slotOptions = useMemo(
     () => ({
@@ -353,8 +403,10 @@ export function BookingWizard({
 
   const slots = useMemo(() => {
     if (!dayAvail || !service) return [];
-    return generateSlots(dayAvail, service.duration_minutes, minNoticeMinutes, date, busy, slotOptions);
-  }, [dayAvail, service, date, minNoticeMinutes, busy]);
+    return generateSlots(dayAvail, effectiveDuration, minNoticeMinutes, date, busy, slotOptions);
+  // effectiveDuration must be a dependency: picking a product that adds time
+  // changes which slots still fit.
+  }, [dayAvail, service, date, minNoticeMinutes, busy, effectiveDuration, slotOptions]);
 
   /*
    * A restored booking proposes a time nobody was holding. Once the real
@@ -386,10 +438,10 @@ export function BookingWizard({
       const ds = format(d, "yyyy-MM-dd");
       const av = availFor(ds);
       if (!av) return null;
-      return generateSlots(av, service.duration_minutes, minNoticeMinutes, ds, busy, slotOptions).length;
+      return generateSlots(av, effectiveDuration, minNoticeMinutes, ds, busy, slotOptions).length;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [service, busy, minNoticeMinutes, availFor]
+    [service, busy, minNoticeMinutes, availFor, effectiveDuration]
   );
 
   // ── Slot hold ────────────────────────────────────────────────────────────
@@ -442,7 +494,7 @@ export function BookingWizard({
     const supabase = createClient();
     const [h, mi] = slot.split(":").map(Number);
     const startsAt = slotToDate(date, h * 60 + mi);
-    const endsAt = new Date(startsAt.getTime() + (service?.duration_minutes ?? 30) * 60000);
+    const endsAt = new Date(startsAt.getTime() + (effectiveDuration || 30) * 60000);
     const { data: holdId } = await supabase.rpc("hold_slot", {
       p_starts: startsAt.toISOString(),
       p_ends: endsAt.toISOString(),
@@ -467,7 +519,7 @@ export function BookingWizard({
     const supabase = createClient();
     const [h, mi] = time.split(":").map(Number);
     const startsAt = slotToDate(date, h * 60 + mi);
-    const endsAt = new Date(startsAt.getTime() + service.duration_minutes * 60000);
+    const endsAt = new Date(startsAt.getTime() + effectiveDuration * 60000);
 
     const { data: inserted, error: insertError } = await supabase
       .from("appointments")
@@ -477,6 +529,9 @@ export function BookingWizard({
         starts_at: startsAt.toISOString(),
         ends_at: endsAt.toISOString(),
         price: servicePrice,
+        // Recorded so a later change to a product's minutes can't silently
+        // rewrite what this appointment was booked as
+        extra_minutes: extraMinutes,
         status: "pendiente",
         guest_name: forGuest ? guestName.trim() : null,
         guest_relationship: forGuest ? relationship : null,
@@ -546,7 +601,7 @@ export function BookingWizard({
 
   // ── Done screen ──────────────────────────────────────────────────────────
   if (done) {
-    const endMins = toMins(time) + (service?.duration_minutes ?? 0);
+    const endMins = toMins(time) + effectiveDuration;
     const endLabel = fmtSlot(
       `${String(Math.floor(endMins / 60)).padStart(2, "0")}:${String(endMins % 60).padStart(2, "0")}`
     );
@@ -601,7 +656,13 @@ export function BookingWizard({
           <Row label={t("booking.time")} value={`${fmtSlot(time)} – ${endLabel}`} />
           <Row
             label={t("booking.duration")}
-            value={`${service?.duration_minutes} ${t("booking.minutes")}`}
+            // Shows the sum when a product lengthened the visit, so the client
+            // isn't surprised by an end time that doesn't match the service
+            value={
+              extraMinutes > 0
+                ? `${effectiveDuration} ${t("booking.minutes")} (${service?.duration_minutes} + ${extraMinutes})`
+                : `${effectiveDuration} ${t("booking.minutes")}`
+            }
           />
           {shopAddress && <Row label={t("booking.location")} value={shopAddress} />}
           <Row label={t("booking.payment")} value={t("booking.payAtShop")} />
@@ -885,47 +946,30 @@ export function BookingWizard({
         <div className="space-y-4">
           <StepTitle title={t("products.question")} hint={t("products.hint")} />
 
-          <ProductGroup
-            title={t("products.dry")}
-            icon={<Wind size={13} />}
-            products={availableUseProducts.filter((p) => p.category === "dry")}
-            selected={chosenProducts}
-            onToggle={(id) =>
-              setChosenProducts((prev) => {
-                const next = new Set(prev);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
-                return next;
-              })
-            }
-          />
-          <ProductGroup
-            title={t("products.wet")}
-            icon={<Droplet size={13} />}
-            products={availableUseProducts.filter((p) => p.category === "wet")}
-            selected={chosenProducts}
-            onToggle={(id) =>
-              setChosenProducts((prev) => {
-                const next = new Set(prev);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
-                return next;
-              })
-            }
-          />
-          <ProductGroup
-            title={t("products.other")}
-            products={availableUseProducts.filter((p) => !p.category)}
-            selected={chosenProducts}
-            onToggle={(id) =>
-              setChosenProducts((prev) => {
-                const next = new Set(prev);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
-                return next;
-              })
-            }
-          />
+          {/*
+            * Grouped by whatever categories the barber actually used, rather
+            * than a hardcoded dry/wet pair — adding "Tinte" in the panel has
+            * to show up here without a code change.
+            */}
+          {groupedUseProducts.map(([categoryId, items]) => (
+            <ProductGroup
+              key={categoryId}
+              title={`${categoryEmoji(categoryId)} ${categoryLabel(categoryId, lang)}`}
+              products={items}
+              selected={chosenProducts}
+              onToggle={toggleUseProduct}
+            />
+          ))}
+
+          {/* Only worth saying once the choice actually costs time */}
+          {extraMinutes > 0 && (
+            <p className="text-xs text-muted bg-surface border border-border rounded-xl px-3.5 py-2.5 flex items-center gap-2">
+              <Timer size={14} className="text-brand shrink-0" />
+              {t("products.addsTime")
+                .replace("{min}", String(extraMinutes))
+                .replace("{total}", String(effectiveDuration))}
+            </p>
+          )}
 
           <button
             onClick={goNext}
@@ -1158,7 +1202,14 @@ export function BookingWizard({
               }
             />
             <Row label={t("booking.service")} value={service?.name ?? ""} />
-            <Row label={t("booking.duration")} value={`${service?.duration_minutes} ${t("booking.minutes")}`} />
+            <Row
+              label={t("booking.duration")}
+              value={
+                extraMinutes > 0
+                  ? `${effectiveDuration} ${t("booking.minutes")} (${service?.duration_minutes} + ${extraMinutes})`
+                  : `${effectiveDuration} ${t("booking.minutes")}`
+              }
+            />
             <Row
               label={t("booking.date")}
               value={format(new Date(date + "T00:00:00"), "EEEE d MMMM yyyy", { locale })}

@@ -80,7 +80,9 @@ export default async function ReservarPage({
       supabase.from("services").select("id, name"),
       supabase
         .from("service_products")
-        .select("service_id, products(id, name, image_url, category, available_for_services)"),
+        .select(
+          "service_id, products(id, name, image_url, category, available_for_services, extra_minutes)"
+        ),
     ]);
 
   const nameById = new Map((allServiceNames ?? []).map((s) => [s.id, s.name]));
@@ -99,8 +101,9 @@ export default async function ReservarPage({
       id: string;
       name: string;
       image_url: string | null;
-      category: "dry" | "wet" | null;
+      category: string | null;
       available_for_services: boolean;
+      extra_minutes: number | null;
     } | null;
     if (!product || !product.available_for_services) continue;
     const list = useProductsByService.get(row.service_id) ?? [];
@@ -109,6 +112,7 @@ export default async function ReservarPage({
       name: product.name,
       image_url: product.image_url,
       category: product.category,
+      extra_minutes: product.extra_minutes ?? 0,
     });
     useProductsByService.set(row.service_id, list);
   }
