@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Playfair_Display, Geist_Mono } from "next/font/google";
 import { SwRegister } from "@/components/pwa/sw-register";
 import { NativeShell } from "@/components/native-shell";
+import { AppSplash } from "@/components/ui/app-splash";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import "./globals.css";
 
 // Same pairing as the barber app so both share one identity
@@ -61,7 +63,10 @@ export default function RootLayout({
       <body className="h-full bg-background text-foreground">
         <SwRegister />
         <NativeShell />
-        {children}
+        {/* Covers the black gap before the first paint */}
+        <AppSplash />
+        {/* Every destructive action asks through our own dialog, not the browser's */}
+        <ConfirmProvider>{children}</ConfirmProvider>
       </body>
     </html>
   );

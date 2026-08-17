@@ -171,3 +171,49 @@ Hasta la 23, el aviso de vacaciones terminado seguirá en el carrusel. Hasta la
 24, registrarse con un correo ya usado seguirá entrando a la cuenta vieja sin
 avisar. **Hasta la 26, la campanita no se llena cuando un cliente reserva** —
 esa es la que quieres correr primero.
+
+---
+
+## 5. Notificaciones push (opcional)
+
+Las push llegan al teléfono aunque la app esté cerrada. Necesitan un par de
+llaves VAPID, que se generan una sola vez:
+
+```bash
+node scripts/generate-vapid-keys.mjs
+```
+
+Copia las cuatro variables que imprime a **los dos proyectos** de Vercel. La
+privada no lleva `NEXT_PUBLIC_`: nunca debe llegar al navegador.
+
+**Dos cosas sobre el iPhone que explican casi todos los "no me llegan":**
+
+1. Safari solo permite push desde una app **añadida a la pantalla de inicio**.
+   En una pestaña normal la API ni siquiera existe.
+2. El permiso debe pedirse desde un toque del usuario. Pedirlo al cargar la
+   página se deniega en silencio.
+
+La app detecta ambos casos y lo dice en pantalla en vez de fallar callada.
+
+Sin las llaves, todo lo demás sigue funcionando: la campanita y los correos no
+dependen de esto.
+
+---
+
+## 6. Migraciones (lista completa)
+
+```
+migration_17_closures_theme_slots.sql
+migration_18a_add_no_show.sql              ← sola, sin nada más
+migration_18b_no_show_rules.sql
+migration_19_product_link.sql
+migration_20_branding.sql
+migration_21_business_identity.sql
+migration_22_promotions_window.sql
+migration_23_carousel_window.sql           ← arregla el carrusel
+migration_24_email_exists.sql
+migration_25_notify_email.sql
+migration_26_appointment_notifications.sql ← la campanita
+migration_27_product_categories_time.sql   ← categorías + tiempo extra
+migration_28_notification_events.sql       ← un evento, varios canales
+```

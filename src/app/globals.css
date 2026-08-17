@@ -167,3 +167,13 @@ button {
 .animate-wiggle {
   animation: wiggle 0.28s ease-in-out infinite;
 }
+
+/* Splash: a sweeping bar rather than a spinner, so it reads as progress */
+@keyframes splash-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
