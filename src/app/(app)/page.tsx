@@ -11,6 +11,7 @@ import { HeroCarousel } from "@/components/home/hero-carousel";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 import { BusinessHeader } from "@/components/home/business-header";
 import { getBusiness } from "@/lib/data/business";
+import { getCarouselPosts } from "@/lib/data/carousel";
 import { getT } from "@/lib/session";
 
 export default async function HomePage() {
@@ -29,7 +30,7 @@ export default async function HomePage() {
 
   if (!client) redirect("/configurar-perfil");
 
-  const [business, { data: nextApt }, { data: services }, { data: carouselPosts }] =
+  const [business, { data: nextApt }, { data: services }, carouselPosts] =
     await Promise.all([
       getBusiness(),
     supabase
@@ -48,17 +49,8 @@ export default async function HomePage() {
       .eq("is_public", true)
       .order("price", { ascending: true })
       .limit(4),
-    /*
-     * RLS keeps drafts, paused and finished posts out (migration 23), but the
-     * window fields come along so the carousel can re-check the clock while
-     * the app stays open — expiry is a clock event, not a database change.
-     */
-    supabase
-      .from("carousel_posts")
-      .select(
-        "id, title, description, image_url, type, button_label, button_href, is_active, is_draft, is_permanent, starts_at, ends_at"
-      )
-      .order("sort_order"),
+    // Degrades gracefully when migration 23 has not run — see lib/data/carousel
+    getCarouselPosts(),
     ]);
 
   const firstName = client.full_name.split(" ")[0];
@@ -84,7 +76,7 @@ export default async function HomePage() {
       </div>
 
       {/* Promotions, closures and announcements managed from the admin panel */}
-      <HeroCarousel posts={carouselPosts ?? []} lang={lang} />
+      <HeroCarousel posts={carouselPosts} lang={lang} />
 
       {/* Next appointment strip */}
       {nextApt && (

@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { MapPin, Phone, AtSign, Store } from "lucide-react";
+import { Phone, AtSign, Store } from "lucide-react";
+import { AddressLink, PhoneLink } from "@/components/ui/address-link";
 import { cn } from "@/lib/utils";
 import type { Business } from "@/lib/data/business";
 
@@ -71,20 +72,22 @@ export function BusinessHeader({
 
         {(address || phone || instagram) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
+            {/* Tapping either one behaves like tapping a phone number */}
             {address && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted min-w-0">
-                <MapPin size={12} className="shrink-0" />
-                <span className="truncate">{address}</span>
-              </span>
+              <AddressLink
+                address={address}
+                name={name}
+                className="text-[11px] font-medium min-w-0 max-w-full"
+              />
             )}
             {phone && (
-              <a
-                href={`tel:${phone}`}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted"
+              <PhoneLink
+                phone={phone}
+                className="inline-flex items-center gap-1 text-[11px] font-medium"
               >
                 <Phone size={12} className="shrink-0" />
                 {phone}
-              </a>
+              </PhoneLink>
             )}
             {instagram && (
               <a

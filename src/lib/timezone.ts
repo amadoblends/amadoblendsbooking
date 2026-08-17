@@ -135,6 +135,21 @@ export function shopDateAt(dateStr: string, hhmm: string): Date {
   return new Date(settled);
 }
 
+/**
+ * Midnight at the *start of the following day*, in the shop's timezone.
+ *
+ * "Stops showing on 6 August" means visible through all of the 6th. Taking
+ * the next day's midnight rather than adding 24 hours keeps that true across
+ * a daylight-saving change, where a day can be 23 or 25 hours long.
+ */
+export function endOfShopDay(dateStr: string): Date {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  // Date.UTC rolls month and year over for us on the last day of a month
+  const next = new Date(Date.UTC(y, mo - 1, d + 1));
+  const nextStr = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+  return shopDateAt(nextStr, "00:00");
+}
+
 /** How far behind UTC the shop is, in ms, at a given instant. */
 function tzOffsetMs(at: Date): number {
   const parts = fmt("en-GB", {
