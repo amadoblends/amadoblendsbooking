@@ -200,12 +200,101 @@ const dict = {
   "shop.empty": { es: "Pronto tendremos productos disponibles.", en: "Products coming soon." },
   "shop.buyOnline": { es: "Comprar online", en: "Buy online" },
 
+  // Feedback
+  "feedback.title": { es: "Comentarios", en: "Feedback" },
+  "feedback.subtitle": {
+    es: "Cuéntanos cómo podemos mejorar",
+    en: "Tell us how we can do better",
+  },
+  "feedback.about": { es: "¿Sobre qué nos escribes?", en: "What is this about?" },
+  "feedback.areaService": { es: "El servicio", en: "The service" },
+  "feedback.areaServiceHint": {
+    es: "Tu corte, la atención, el local",
+    en: "Your cut, the service, the shop",
+  },
+  "feedback.areaApp": { es: "La aplicación", en: "The app" },
+  "feedback.areaAppHint": {
+    es: "Algo que falla o se puede mejorar",
+    en: "Something broken or worth improving",
+  },
+  "feedback.rating": { es: "¿Cómo estuvo?", en: "How was it?" },
+  "feedback.placeholderApp": {
+    es: "Describe qué pasó o qué te gustaría ver...",
+    en: "Describe what happened or what you'd like to see...",
+  },
+  "feedback.placeholderService": {
+    es: "Cuéntanos de tu visita...",
+    en: "Tell us about your visit...",
+  },
+  "feedback.send": { es: "Enviar comentario", en: "Send feedback" },
+  "feedback.failed": {
+    es: "No se pudo enviar. Inténtalo de nuevo.",
+    en: "Couldn't send it. Please try again.",
+  },
+  "feedback.thanks": { es: "¡Gracias por escribirnos!", en: "Thanks for writing!" },
+  "feedback.thanksHint": {
+    es: "Leemos todos los comentarios.",
+    en: "We read every message.",
+  },
+  "feedback.sendAnother": { es: "Enviar otro comentario", en: "Send another" },
+  "feedback.yours": { es: "Tus comentarios", en: "Your feedback" },
+
+  // Birthday
+  "birthday.happy": { es: "¡Feliz cumpleaños", en: "Happy birthday" },
+  "birthday.gift": { es: "Tienes un regalo esperándote", en: "You have a gift waiting" },
+  "birthday.discountApplied": {
+    es: "Descuento de cumpleaños aplicado",
+    en: "Birthday discount applied",
+  },
+  "birthday.soon": { es: "Tu cumpleaños se acerca", en: "Your birthday is coming up" },
+
+  // Closures and carousel
+  "closure.backOn": { es: "Estaré de vuelta el", en: "Back on" },
+  "carousel.fallbackTitle": {
+    es: "Tu mejor versión comienza aquí",
+    en: "Your best version starts here",
+  },
+
+  // Profile editing
+  "profile.updated": { es: "¡Perfil actualizado!", en: "Profile updated!" },
+  "profile.phonePlaceholder": {
+    es: "Teléfono (ej. 787-555-0000)",
+    en: "Phone (e.g. 787-555-0000)",
+  },
+  "profile.phoneInvalid": {
+    es: "Ingresa un teléfono válido.",
+    en: "Enter a valid phone number.",
+  },
+  "profile.emailUnchanged": {
+    es: "Datos guardados, pero el correo de acceso no cambió:",
+    en: "Details saved, but your sign-in email didn't change:",
+  },
+  "profile.photoType": {
+    es: "Solo se permiten imágenes JPG, PNG o WEBP.",
+    en: "Only JPG, PNG or WEBP images are allowed.",
+  },
+  "profile.photoTooBig": {
+    es: "La imagen no debe superar 5MB.",
+    en: "The image must be under 5MB.",
+  },
+  "profile.applyingLanguage": {
+    es: "Aplicando idioma / Applying language...",
+    en: "Applying language / Aplicando idioma...",
+  },
+
+  // Confirmations
+  "confirm.cancelAppointment": { es: "¿Cancelar esta cita?", en: "Cancel this appointment?" },
+  "confirm.yes": { es: "Sí, cancelar", en: "Yes, cancel" },
+  "confirm.no": { es: "No, mantener", en: "No, keep it" },
+
   // Common
   "common.back": { es: "Volver", en: "Back" },
   "common.cancel": { es: "Cancelar", en: "Cancel" },
+  "common.confirm": { es: "Confirmar", en: "Confirm" },
   "common.saving": { es: "Guardando...", en: "Saving..." },
   "common.loading": { es: "Cargando...", en: "Loading..." },
   "common.notifications": { es: "Notificaciones", en: "Notifications" },
+  "common.switchingLanguage": { es: "Cambiando idioma...", en: "Switching language..." },
 } as const;
 
 export type TranslationKey = keyof typeof dict;

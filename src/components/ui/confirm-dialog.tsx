@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { AlertTriangle, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/components/i18n/language-provider";
 
 /**
  * Replaces `window.confirm`.
@@ -36,6 +37,7 @@ export function useConfirm() {
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useT();
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const [working, setWorking] = useState(false);
   const resolver = useRef<Resolver | null>(null);
@@ -106,7 +108,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   disabled={working}
                   className="flex-1 h-12 rounded-2xl border border-border bg-background text-sm font-semibold text-foreground active:scale-95 transition-transform"
                 >
-                  {options.cancelLabel ?? "Cancelar"}
+                  {options.cancelLabel ?? t("common.cancel")}
                 </button>
                 <button
                   onClick={() => {
@@ -122,7 +124,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   {working && <Loader2 size={15} className="animate-spin" />}
-                  {options.confirmLabel ?? "Confirmar"}
+                  {options.confirmLabel ?? t("common.confirm")}
                 </button>
               </div>
             </div>

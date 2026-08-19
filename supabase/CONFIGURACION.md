@@ -165,12 +165,24 @@ migration_23_carousel_window.sql
 migration_24_email_exists.sql        ← "ese correo ya tiene cuenta"
 migration_25_notify_email.sql        ← el correo que recibe los avisos
 migration_26_appointment_notifications.sql  ← la campanita (¡esta primero!)
+migration_27_product_categories_time.sql
+migration_28_notification_events.sql
+migration_29_clients_birthday_feedback.sql  ← cumpleaños, walk-ins y comentarios
+migration_30_seen_markers.sql               ← el número rojo en Citas
 ```
 
 Hasta la 23, el aviso de vacaciones terminado seguirá en el carrusel. Hasta la
 24, registrarse con un correo ya usado seguirá entrando a la cuenta vieja sin
 avisar. **Hasta la 26, la campanita no se llena cuando un cliente reserva** —
 esa es la que quieres correr primero.
+
+Hasta la 29 no hay buzón de comentarios ni descuento de cumpleaños, y un
+cliente que ya tenías apuntado a mano no se engancha a su cuenta al
+registrarse: se le crearía un perfil nuevo y vacío. Hasta la 30 no aparece el
+número de citas nuevas sobre el icono de Citas.
+
+Mientras falten, la app no se rompe: cada pantalla lo dice o simplemente no
+muestra esa parte.
 
 ---
 

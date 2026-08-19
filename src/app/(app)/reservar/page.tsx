@@ -2,6 +2,7 @@ import { shopToday } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BookingWizard, type WizardServiceProduct } from "@/components/booking/booking-wizard";
+import { getBirthdaySettings } from "@/lib/data/birthday";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function ReservarPage({
@@ -19,7 +20,7 @@ export default async function ReservarPage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, full_name, first_name")
+    .select("id, full_name, first_name, birth_date")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -125,6 +126,9 @@ export default async function ReservarPage({
 
   const ownerName = client.first_name ?? client.full_name.split(" ")[0];
 
+  // Off by default until the barber turns it on — see lib/data/birthday
+  const birthdaySettings = await getBirthdaySettings();
+
   // Barber details for the confirmation screen
   const { data: barber } = await supabase
     .from("profiles")
@@ -155,6 +159,8 @@ export default async function ReservarPage({
         barberName={barber?.full_name ?? "Amado"}
         barberAvatarUrl={barber?.avatar_url ?? null}
         shopAddress="Amado Blends Barbershop"
+        clientBirthDate={client.birth_date}
+        birthdaySettings={birthdaySettings}
       />
     </div>
   );

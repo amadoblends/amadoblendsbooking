@@ -85,7 +85,10 @@ export function ClosureNotice({
           <div className="bg-success-light rounded-xl border border-success/20 px-4 py-3">
             <p className="text-sm font-semibold text-success capitalize">
               {lang === "en" ? "Back on " : "Estaré de vuelta el "}
-              {format(returnDate, "EEEE d 'de' MMMM", { locale })}
+              {/* The Spanish "de" has no English twin — one pattern each */}
+              {format(returnDate, lang === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", {
+                locale,
+              })}
             </p>
           </div>
         )}

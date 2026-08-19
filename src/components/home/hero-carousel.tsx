@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { visiblePosts, nextTransitionAt } from "@/lib/carousel-status";
+import { translate } from "@/lib/i18n";
 
 export interface CarouselPost {
   id: string;
@@ -77,7 +78,12 @@ export function HeroCarousel({
    * running. A finished promotion is never a fallback.
    */
   const visible = useMemo(() => visiblePosts(posts, now), [posts, now]);
-  const slides = visible.length > 0 ? visible : [FALLBACK];
+  // The fallback is the only slide whose text we author, so it gets
+  // translated like everything else the client reads.
+  const slides =
+    visible.length > 0
+      ? visible
+      : [{ ...FALLBACK, title: translate("carousel.fallbackTitle", lang) }];
   const count = slides.length;
 
   // A shrinking list must not leave the dots pointing past the end
@@ -211,7 +217,7 @@ function Slide({ post, lang }: { post: CarouselPost; lang: "es" | "en" }) {
 // Last resort: nothing live and no permanent content configured either
 const FALLBACK: CarouselPost = {
   id: "fallback",
-  title: "Tu mejor versión comienza aquí",
+  title: "",
   description: null,
   image_url: null,
   type: "info",

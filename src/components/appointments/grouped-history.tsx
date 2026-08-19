@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { es, enUS } from "date-fns/locale";
+import { useT } from "@/components/i18n/language-provider";
 import { ChevronDown, ChevronRight, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shopTime, shopDateStr } from "@/lib/timezone";
@@ -47,6 +48,9 @@ function localKey(iso: string, part: "year" | "month" | "day") {
 }
 
 export function GroupedHistory({ appointments }: { appointments: HistoryAppointment[] }) {
+  // Day and month names follow the client's language, like the rest of the app
+  const { lang } = useT();
+  const locale = lang === "en" ? enUS : es;
   // Newest year and its newest month start open; the rest collapsed
   const grouped = useMemo<YearGroup[]>(() => {
     const years = new Map<string, Map<string, Map<string, HistoryAppointment[]>>>();
@@ -73,7 +77,7 @@ export function GroupedHistory({ appointments }: { appointments: HistoryAppointm
               .sort((a, b) => (a[0] < b[0] ? 1 : -1))
               .map(([dKey, items]) => ({
                 key: dKey,
-                label: format(new Date(dKey + "T00:00:00"), "EEEE d", { locale: es }),
+                label: format(new Date(dKey + "T00:00:00"), "EEEE d", { locale }),
                 items: items.sort(
                   (x, y2) =>
                     new Date(y2.starts_at).getTime() - new Date(x.starts_at).getTime()
@@ -81,7 +85,7 @@ export function GroupedHistory({ appointments }: { appointments: HistoryAppointm
               }));
             return {
               key: mKey,
-              label: format(new Date(mKey + "-01T00:00:00"), "MMMM", { locale: es }),
+              label: format(new Date(mKey + "-01T00:00:00"), "MMMM", { locale }),
               total: dayGroups.reduce((s, d) => s + d.items.length, 0),
               days: dayGroups,
             };

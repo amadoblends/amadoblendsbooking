@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { Clock, Scissors } from "lucide-react";
+import { Cake, Clock, Scissors } from "lucide-react";
 // Times must read the same here as on the barber's calendar — see lib/timezone
 import { shopTime, shopShortDate } from "@/lib/timezone";
 import Link from "next/link";
@@ -13,6 +13,8 @@ import { BusinessHeader } from "@/components/home/business-header";
 import { getBusiness } from "@/lib/data/business";
 import { getCarouselPosts } from "@/lib/data/carousel";
 import { getT } from "@/lib/session";
+import { isBirthdayToday, isInBirthdayWindow } from "@/lib/client-rules";
+import { getBirthdaySettings } from "@/lib/data/birthday";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -24,13 +26,13 @@ export default async function HomePage() {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, full_name")
+    .select("id, full_name, birth_date")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (!client) redirect("/configurar-perfil");
 
-  const [business, { data: nextApt }, { data: services }, carouselPosts] =
+  const [business, { data: nextApt }, { data: services }, carouselPosts, birthday] =
     await Promise.all([
       getBusiness(),
     supabase
@@ -51,10 +53,15 @@ export default async function HomePage() {
       .limit(4),
     // Degrades gracefully when migration 23 has not run — see lib/data/carousel
     getCarouselPosts(),
+    getBirthdaySettings(),
     ]);
 
   const firstName = client.full_name.split(" ")[0];
   const { t, lang } = await getT();
+
+  const isBirthday = isBirthdayToday(client.birth_date);
+  // The gift banner runs the whole window; the greeting only on the day
+  const hasGift = isInBirthdayWindow(client.birth_date, birthday);
 
   return (
     <div className="px-4 pt-[max(12px,var(--safe-top))] pb-4 space-y-5">
@@ -70,10 +77,35 @@ export default async function HomePage() {
       {/* Greeting */}
       <div>
         <h2 className="text-xl font-bold text-foreground">
-          {t("home.greeting")}, {firstName}! 👋
+          {isBirthday ? t("birthday.happy") : t("home.greeting")}, {firstName}!{" "}
+          {isBirthday ? "🎂" : "👋"}
         </h2>
-        <p className="text-sm text-muted mt-0.5">{t("home.subtitle")}</p>
+        <p className="text-sm text-muted mt-0.5">
+          {isBirthday ? t("birthday.gift") : t("home.subtitle")}
+        </p>
       </div>
+
+      {/* The discount is real, so it says so where they'll book from */}
+      {hasGift && (
+        <Link
+          href="/reservar"
+          className="flex items-center gap-3 rounded-2xl border border-brand/30 bg-brand-light p-4 active:scale-[0.99] transition-transform"
+        >
+          <span className="w-11 h-11 rounded-xl bg-brand text-white flex items-center justify-center shrink-0">
+            <Cake size={20} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-foreground">
+              {birthday.birthday_kind === "percent"
+                ? `${birthday.birthday_amount}% ${t("booking.discount").toLowerCase()}`
+                : `$${birthday.birthday_amount} ${t("booking.discount").toLowerCase()}`}
+            </span>
+            <span className="block text-xs text-muted">
+              {isBirthday ? t("birthday.gift") : t("birthday.soon")}
+            </span>
+          </span>
+        </Link>
+      )}
 
       {/* Promotions, closures and announcements managed from the admin panel */}
       <HeroCarousel posts={carouselPosts} lang={lang} />

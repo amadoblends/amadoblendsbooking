@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { OtpPanel } from "@/components/auth/otp-panel";
 import { AvatarUploader } from "@/components/ui/avatar-uploader";
 import { LANGUAGES, type Language } from "@/lib/i18n";
+import { useT } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 interface ProfileData {
@@ -22,6 +23,7 @@ interface ProfileData {
 type Stage = "edit" | "otp" | "saved";
 
 export function ProfileEditor({ profile }: { profile: ProfileData }) {
+  const { t } = useT();
   const router = useRouter();
 
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -79,7 +81,7 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
     if (email.trim() !== profile.email) {
       const { error: authError } = await supabase.auth.updateUser({ email: email.trim() });
       if (authError) {
-        return "Datos guardados, pero el correo de acceso no cambió: " + authError.message;
+        return t("profile.emailUnchanged") + " " + authError.message;
       }
     }
     return null;
@@ -119,7 +121,7 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
         <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto">
           <Check size={22} className="text-success" />
         </div>
-        <p className="text-sm font-semibold text-success">¡Perfil actualizado!</p>
+        <p className="text-sm font-semibold text-success">{t("profile.updated")}</p>
         {email.trim() !== profile.email && (
           <p className="text-xs text-muted">
             Revisa tu correo nuevo para confirmar el cambio de dirección de acceso.
@@ -173,12 +175,12 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
         />
 
         <div className="grid grid-cols-2 gap-3">
-          <LabeledInput label="Nombre" value={firstName} onChange={setFirstName} required />
-          <LabeledInput label="Apellido" value={lastName} onChange={setLastName} />
+          <LabeledInput label={t("profile.firstName")} value={firstName} onChange={setFirstName} required />
+          <LabeledInput label={t("profile.lastName")} value={lastName} onChange={setLastName} />
         </div>
 
-        <LabeledInput label="Teléfono" value={phone} onChange={setPhone} type="tel" required />
-        <LabeledInput label="Correo electrónico" value={email} onChange={setEmail} type="email" required />
+        <LabeledInput label={t("profile.phone")} value={phone} onChange={setPhone} type="tel" required />
+        <LabeledInput label={t("profile.email")} value={email} onChange={setEmail} type="email" required />
       </div>
 
       {/* Language */}

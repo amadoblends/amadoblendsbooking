@@ -7,7 +7,8 @@ import {
   startOfWeek, endOfWeek, eachDayOfInterval, format,
   isSameMonth, isSameDay, isBefore, isAfter, startOfDay, addDays,
 } from "date-fns";
-import { es } from "date-fns/locale";
+import { es, enUS } from "date-fns/locale";
+import { useT } from "@/components/i18n/language-provider";
 import { ChevronLeft, ChevronRight, Loader2, CalendarClock, Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { shopDateAt } from "@/lib/timezone";
@@ -61,6 +62,9 @@ export function RescheduleClient({
   bookingWindowDays: number;
 }) {
   const router = useRouter();
+  // Day and month names follow the client's language
+  const { lang } = useT();
+  const locale = lang === "en" ? enUS : es;
   const current = new Date(currentStartsAt);
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(format(current, "yyyy-MM-dd"));
@@ -173,7 +177,7 @@ export function RescheduleClient({
         <Check size={22} className="text-success mx-auto" />
         <p className="text-sm font-semibold text-success">¡Cita reagendada!</p>
         <p className="text-xs text-muted capitalize">
-          {format(new Date(date + "T00:00:00"), "EEEE d 'de' MMMM", { locale: es })} ·{" "}
+          {format(new Date(date + "T00:00:00"), lang === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale })} ·{" "}
           {fmtSlot(time)}
         </p>
       </div>
@@ -216,7 +220,7 @@ export function RescheduleClient({
             <ChevronLeft size={14} />
           </button>
           <p className="font-semibold text-sm text-foreground capitalize">
-            {format(calCursor, "MMMM yyyy", { locale: es })}
+            {format(calCursor, "MMMM yyyy", { locale })}
           </p>
           <button
             onClick={() => setCalCursor((c) => addMonths(c, 1))}

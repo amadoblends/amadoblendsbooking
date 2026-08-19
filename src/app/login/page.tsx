@@ -2,14 +2,20 @@
 
 import { Suspense, useState } from "react";
 import {
-  Scissors, Loader2, Mail, Lock, User, Phone, Eye, EyeOff, ShieldCheck, ArrowLeft,
+  Scissors, Loader2, Mail, User, Phone, ShieldCheck, ArrowLeft, Cake,
+  KeyRound, Lock, Eye, EyeOff, Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { PasswordFields, passwordsOk } from "@/components/auth/password-fields";
 
 type Mode = "login" | "register";
-type Step = "form" | "otp";
+type Step = "form" | "otp" | "forgot" | "forgotOtp" | "forgotNew";
+
+/** Oldest and youngest a birth date may plausibly be. */
+const DOB_MAX = new Date(Date.now() - 13 * 365.25 * 86_400_000).toISOString().slice(0, 10);
+const DOB_MIN = "1920-01-01";
 
 export default function LoginPage() {
   return (
@@ -29,15 +35,24 @@ function LoginPageInner() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [otp, setOtp] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(params.get("error"));
   const [notice, setNotice] = useState<string | null>(null);
-  // Set when someone tries to register with an address that already has an account
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
+  /** A walk-in profile the barber already made for this person. */
+  const [claimable, setClaimable] = useState<{
+    id: string;
+    full_name: string;
+    visit_count: number;
+  } | null>(null);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -45,6 +60,7 @@ function LoginPageInner() {
     setError(null);
     setNotice(null);
     setExistingEmail(null);
+    setClaimable(null);
     setOtp("");
   }
 
@@ -65,7 +81,6 @@ function LoginPageInner() {
       setError(error.message);
       setLoading(false);
     }
-    // On success the browser navigates away — keep the spinner up
   }
 
   // ── Login ───────────────────────────────────────────────────────────────
@@ -76,7 +91,10 @@ function LoginPageInner() {
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: loginPassword,
+    });
 
     if (error) {
       setError(
@@ -92,38 +110,26 @@ function LoginPageInner() {
     router.refresh();
   }
 
-  // ── Register: step 1 — send the code ────────────────────────────────────
+  // ── Register: send the code ─────────────────────────────────────────────
 
-  async function handleSendCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-
+  async function sendCode(target = email) {
     const supabase = createClient();
 
     /*
-     * Supabase intentionally never says whether an email is taken — with
-     * shouldCreateUser:true it just signs the person into the account that
-     * already existed, which looks like a broken registration. Ask first so
-     * we can send them to the login tab instead.
+     * Supabase never says whether an address is taken — signInWithOtp would
+     * just sign them into the existing account, which reads as a broken
+     * registration. Ask first.
      */
     const { data: taken, error: checkError } = await supabase.rpc("email_has_account", {
-      p_email: email,
+      p_email: target,
     });
-
     if (!checkError && taken === true) {
-      setExistingEmail(email);
-      setLoading(false);
-      return;
+      setExistingEmail(target);
+      return false;
     }
 
-    // Creates the auth user only once the code is verified
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: target,
       options: {
         shouldCreateUser: true,
         data: {
@@ -141,16 +147,25 @@ function LoginPageInner() {
           ? "Demasiados intentos. Espera un minuto e inténtalo otra vez."
           : error.message
       );
-      setLoading(false);
+      return false;
+    }
+    setNotice(`Te enviamos un código de 6 dígitos a ${target}`);
+    return true;
+  }
+
+  async function handleSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!passwordsOk(password, confirmPassword)) {
+      setError("Revisa la contraseña y su confirmación.");
       return;
     }
-
-    setNotice(`Te enviamos un código de 6 dígitos a ${email}`);
-    setStep("otp");
+    setLoading(true);
+    setError(null);
+    if (await sendCode()) setStep("otp");
     setLoading(false);
   }
 
-  // ── Register: step 2 — verify and finish ────────────────────────────────
+  // ── Register: verify and finish ─────────────────────────────────────────
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
@@ -170,7 +185,7 @@ function LoginPageInner() {
       return;
     }
 
-    // Verified → now it's safe to set the password and create the profile
+    // Verified — only now is it safe to set a password and create the profile
     await supabase.auth.updateUser({ password });
 
     const { data: existing } = await supabase
@@ -180,42 +195,203 @@ function LoginPageInner() {
       .maybeSingle();
 
     if (!existing) {
-      await supabase.from("clients").insert({
-        full_name: `${firstName} ${lastName}`.trim(),
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone.trim(),
-        email,
-        user_id: data.user.id,
-        segment: "nuevo",
-      });
+      /*
+       * The barber may already keep a profile for this person as a walk-in.
+       * Offer to adopt it rather than start a second, empty history.
+       */
+      const { data: match } = await supabase
+        .rpc("find_unclaimed_client", { p_email: email, p_phone: phone })
+        .maybeSingle();
+
+      if (match && (match as { id: string }).id) {
+        setClaimable(match as { id: string; full_name: string; visit_count: number });
+        setLoading(false);
+        return;
+      }
+
+      await createProfile(data.user.id);
     }
 
+    finish();
+  }
+
+  async function createProfile(userId: string) {
+    const supabase = createClient();
+    await supabase.from("clients").insert({
+      full_name: `${firstName} ${lastName}`.trim(),
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone.trim(),
+      email,
+      birth_date: dob || null,
+      user_id: userId,
+    });
+  }
+
+  /** Adopt the barber's existing profile, keeping its history. */
+  async function claimProfile() {
+    setLoading(true);
+    const supabase = createClient();
+    const { data: ok } = await supabase.rpc("claim_client_profile", {
+      p_client_id: claimable!.id,
+    });
+
+    if (ok) {
+      // Fill in whatever the barber didn't have
+      await supabase
+        .from("clients")
+        .update({
+          email,
+          birth_date: dob || null,
+          first_name: firstName || undefined,
+          last_name: lastName || undefined,
+        })
+        .eq("id", claimable!.id);
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) await createProfile(user.id);
+    }
+    finish();
+  }
+
+  /**
+   * Only here does the browser get a chance to offer "save password" — the
+   * form is submitted for real, with the account already created. Prompting
+   * earlier interrupted a registration that hadn't happened yet.
+   */
+  function finish() {
     setLoading(false);
     router.push("/");
     router.refresh();
   }
 
-  async function resendCode() {
+  // ── Forgot password ─────────────────────────────────────────────────────
+
+  async function handleForgotSend(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
+
     const supabase = createClient();
+    // shouldCreateUser:false — recovery must never invent an account
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: { shouldCreateUser: false },
     });
-    setNotice(error ? null : "Te reenviamos el código.");
-    if (error) setError("No se pudo reenviar. Espera un minuto.");
+
+    if (error) {
+      setError(
+        error.message.toLowerCase().includes("rate")
+          ? "Demasiados intentos. Espera un minuto."
+          : "No encontramos una cuenta con ese correo."
+      );
+      setLoading(false);
+      return;
+    }
+    setNotice(`Te enviamos un código a ${email}`);
+    setStep("forgotOtp");
     setLoading(false);
   }
 
-  // ── OTP screen ──────────────────────────────────────────────────────────
+  async function handleForgotVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  if (step === "otp") {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp.trim(),
+      type: "email",
+    });
+
+    if (error || !data.user) {
+      setError("Código incorrecto o expirado.");
+      setLoading(false);
+      return;
+    }
+    setStep("forgotNew");
+    setNotice(null);
+    setLoading(false);
+  }
+
+  async function handleForgotSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!passwordsOk(password, confirmPassword)) {
+      setError("Revisa la contraseña y su confirmación.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      setError("No se pudo cambiar la contraseña. Intenta de nuevo.");
+      setLoading(false);
+      return;
+    }
+    finish();
+  }
+
+  // ── The barber already knows this person ────────────────────────────────
+
+  if (claimable) {
+    return (
+      <Shell>
+        <div className="text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-brand-light flex items-center justify-center mx-auto">
+            <Check size={26} className="text-brand" />
+          </div>
+          <div>
+            <h2 className="font-bold text-foreground text-lg">Ya te conocemos</h2>
+            <p className="text-sm text-muted mt-1.5 leading-relaxed">
+              Tu barbero ya tenía un perfil tuyo
+              {claimable.visit_count > 0
+                ? ` con ${claimable.visit_count} ${claimable.visit_count === 1 ? "visita" : "visitas"}`
+                : ""}
+              . Podemos unirlo a tu cuenta nueva para que conserves tu historial.
+            </p>
+          </div>
+
+          <button
+            onClick={claimProfile}
+            disabled={loading}
+            className="w-full h-12 rounded-xl bg-brand text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Sí, es mi historial
+          </button>
+          <button
+            onClick={async () => {
+              setLoading(true);
+              const supabase = createClient();
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+              if (user) await createProfile(user.id);
+              finish();
+            }}
+            disabled={loading}
+            className="w-full text-xs text-muted font-medium py-1"
+          >
+            No soy yo, empezar de cero
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── OTP screens ─────────────────────────────────────────────────────────
+
+  if (step === "otp" || step === "forgotOtp") {
+    const forgot = step === "forgotOtp";
     return (
       <Shell>
         <button
-          onClick={() => setStep("form")}
+          onClick={() => setStep(forgot ? "forgot" : "form")}
           className="flex items-center gap-1.5 text-sm text-muted mb-4"
         >
           <ArrowLeft size={15} /> Volver
@@ -227,12 +403,54 @@ function LoginPageInner() {
           </div>
           <h2 className="font-bold text-foreground text-lg">Verifica tu correo</h2>
           <p className="text-sm text-muted mt-1">
-            Ingresa el código de 6 dígitos que enviamos a{" "}
-            <span className="text-foreground font-medium">{email}</span>
+            Ingresa el código de 6 dígitos que enviamos a
           </p>
+
+          {/*
+            * The address is editable right here. A typo used to mean starting
+            * the whole registration again to fix one character.
+            */}
+          <div className="flex items-center gap-1.5 mt-2 bg-background border border-border rounded-xl px-3 py-2">
+            <Mail size={14} className="text-muted shrink-0" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 min-w-0 bg-transparent text-sm text-foreground text-center focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setLoading(true);
+              setError(null);
+              setOtp("");
+              const ok = forgot
+                ? await (async () => {
+                    const supabase = createClient();
+                    const { error } = await supabase.auth.signInWithOtp({
+                      email,
+                      options: { shouldCreateUser: false },
+                    });
+                    if (error) {
+                      setError("No encontramos una cuenta con ese correo.");
+                      return false;
+                    }
+                    setNotice(`Te enviamos un código a ${email}`);
+                    return true;
+                  })()
+                : await sendCode(email);
+              if (!ok && !error) setStep(forgot ? "forgot" : "form");
+              setLoading(false);
+            }}
+            disabled={loading}
+            className="text-xs text-brand font-bold mt-2"
+          >
+            Corregir correo y reenviar
+          </button>
         </div>
 
-        <form onSubmit={handleVerify} className="space-y-3">
+        <form onSubmit={forgot ? handleForgotVerify : handleVerify} className="space-y-3">
           <input
             type="text"
             inputMode="numeric"
@@ -255,24 +473,9 @@ function LoginPageInner() {
             className="w-full h-12 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
-            Verificar y crear cuenta
+            {forgot ? "Verificar" : "Verificar y crear cuenta"}
           </button>
 
-          <button
-            type="button"
-            onClick={resendCode}
-            disabled={loading}
-            className="w-full text-xs text-muted font-medium py-1"
-          >
-            ¿No recibiste el código? Reenviar
-          </button>
-
-          {/*
-            * If the Supabase Magic Link template has no {{ .Token }}, the
-            * email arrives as a "Sign in" link with no digits in it. Nothing
-            * in the code can detect that, so say it plainly — otherwise the
-            * screen just looks broken. See supabase/CONFIGURACION.md.
-            */}
           <p className="text-[11px] text-muted/70 text-center leading-relaxed pt-1">
             Si el correo trae un enlace en vez de 6 dígitos, tócalo para entrar.
           </p>
@@ -281,7 +484,93 @@ function LoginPageInner() {
     );
   }
 
+  // ── Forgot: ask for the address ─────────────────────────────────────────
+
+  if (step === "forgot") {
+    return (
+      <Shell>
+        <button
+          onClick={() => {
+            setStep("form");
+            setError(null);
+          }}
+          className="flex items-center gap-1.5 text-sm text-muted mb-4"
+        >
+          <ArrowLeft size={15} /> Volver
+        </button>
+
+        <div className="text-center mb-5">
+          <div className="w-14 h-14 rounded-2xl bg-brand-light flex items-center justify-center mx-auto mb-3">
+            <KeyRound size={24} className="text-brand" />
+          </div>
+          <h2 className="font-bold text-foreground text-lg">Recuperar contraseña</h2>
+          <p className="text-sm text-muted mt-1">
+            Te enviaremos un código para verificar que la cuenta es tuya.
+          </p>
+        </div>
+
+        <form onSubmit={handleForgotSend} className="space-y-3">
+          <Field
+            icon={<Mail size={15} />}
+            type="email"
+            placeholder="Tu correo"
+            value={email}
+            onChange={setEmail}
+          />
+          {error && <p className="text-xs text-danger text-center">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-12 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Enviar código
+          </button>
+        </form>
+      </Shell>
+    );
+  }
+
+  // ── Forgot: the new password ────────────────────────────────────────────
+
+  if (step === "forgotNew") {
+    return (
+      <Shell>
+        <div className="text-center mb-5">
+          <div className="w-14 h-14 rounded-2xl bg-success-light flex items-center justify-center mx-auto mb-3">
+            <Check size={26} className="text-success" />
+          </div>
+          <h2 className="font-bold text-foreground text-lg">Nueva contraseña</h2>
+          <p className="text-sm text-muted mt-1">Elige una que recuerdes.</p>
+        </div>
+
+        <form onSubmit={handleForgotSave} className="space-y-3">
+          <PasswordFields
+            password={password}
+            confirm={confirmPassword}
+            onPassword={setPassword}
+            onConfirm={setConfirmPassword}
+          />
+          {error && <p className="text-xs text-danger text-center">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading || !passwordsOk(password, confirmPassword)}
+            className="w-full h-12 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Guardar y entrar
+          </button>
+        </form>
+      </Shell>
+    );
+  }
+
   // ── Login / register form ───────────────────────────────────────────────
+
+  const canRegister =
+    firstName.trim().length > 1 &&
+    email.includes("@") &&
+    passwordsOk(password, confirmPassword);
 
   return (
     <Shell>
@@ -328,20 +617,69 @@ function LoginPageInner() {
               <Field icon={<User size={15} />} type="text" placeholder="Apellido" value={lastName} onChange={setLastName} />
             </div>
             <Field icon={<Phone size={15} />} type="tel" placeholder="Teléfono" value={phone} onChange={setPhone} />
+
+            {/* Birth date: powers the birthday greeting and its discount */}
+            <div className="relative">
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
+                <Cake size={15} />
+              </div>
+              <input
+                type="date"
+                value={dob}
+                min={DOB_MIN}
+                max={DOB_MAX}
+                onChange={(e) => setDob(e.target.value)}
+                className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
+              />
+              {!dob && (
+                <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">
+                  Fecha de nacimiento
+                </span>
+              )}
+            </div>
           </>
         )}
 
         <Field icon={<Mail size={15} />} type="email" placeholder="Correo electrónico" value={email} onChange={setEmail} />
-        <PasswordField value={password} onChange={setPassword} />
 
-        {/* Already registered — offer the way forward rather than a dead end */}
+        {mode === "register" ? (
+          <PasswordFields
+            password={password}
+            confirm={confirmPassword}
+            onPassword={setPassword}
+            onConfirm={setConfirmPassword}
+          />
+        ) : (
+          <div className="relative">
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
+              <Lock size={15} />
+            </div>
+            <input
+              type={showLoginPassword ? "text" : "password"}
+              placeholder="Contraseña"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              autoComplete="current-password"
+              className="w-full h-12 pl-10 pr-12 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand placeholder:text-muted"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowLoginPassword((s) => !s)}
+              aria-label={showLoginPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-muted"
+            >
+              {showLoginPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+        )}
+
         {existingEmail && (
           <div className="bg-warning-light border border-warning/25 rounded-xl p-3.5 space-y-2.5">
             <p className="text-sm font-bold text-warning">Ese correo ya tiene cuenta</p>
             <p className="text-xs text-muted leading-relaxed">
               <span className="text-foreground font-medium">{existingEmail}</span> ya está
-              registrado en Amado Blends. Inicia sesión con tu contraseña, o entra con Google si
-              así creaste la cuenta.
+              registrado. Inicia sesión, o entra con Google si así creaste la cuenta.
             </p>
             <div className="flex gap-2">
               <button
@@ -373,14 +711,27 @@ function LoginPageInner() {
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full h-12 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2"
+          disabled={loading || (mode === "register" && !canRegister)}
+          className="w-full h-12 rounded-xl bg-brand text-white font-semibold text-sm disabled:opacity-40 flex items-center justify-center gap-2"
         >
           {loading && <Loader2 size={16} className="animate-spin" />}
           {mode === "login" ? "Entrar" : "Continuar"}
         </button>
 
-        {mode === "register" && (
+        {mode === "login" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setStep("forgot");
+              setError(null);
+              setPassword("");
+              setConfirmPassword("");
+            }}
+            className="w-full text-xs text-brand font-semibold py-1"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        ) : (
           <p className="text-[11px] text-muted text-center leading-relaxed">
             Te enviaremos un código para verificar tu correo antes de crear la cuenta.
           </p>
@@ -438,34 +789,6 @@ function Field({
         className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand placeholder:text-muted"
         required
       />
-    </div>
-  );
-}
-
-function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="relative">
-      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
-        <Lock size={15} />
-      </div>
-      <input
-        type={show ? "text" : "password"}
-        placeholder="Contraseña"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        minLength={6}
-        className="w-full h-12 pl-10 pr-12 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand placeholder:text-muted"
-        required
-      />
-      <button
-        type="button"
-        onClick={() => setShow((s) => !s)}
-        aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-muted"
-      >
-        {show ? <EyeOff size={17} /> : <Eye size={17} />}
-      </button>
     </div>
   );
 }

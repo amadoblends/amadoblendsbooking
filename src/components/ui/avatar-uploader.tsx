@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useT } from "@/components/i18n/language-provider";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -17,6 +18,7 @@ export function AvatarUploader({
   fallback: string;
   onChange: (url: string | null) => void;
 }) {
+  const { t } = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +26,11 @@ export function AvatarUploader({
   async function handleFile(file: File) {
     setError(null);
     if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Solo se permiten imágenes JPG, PNG o WEBP.");
+      setError(t("profile.photoType"));
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
-      setError("La imagen no debe superar 5MB.");
+      setError(t("profile.photoTooBig"));
       return;
     }
 

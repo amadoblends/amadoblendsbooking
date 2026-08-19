@@ -2,7 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Calendar, Scissors, Pencil, Globe, Bell, Mail, Phone } from "lucide-react";
+import {
+  ChevronRight,
+  Calendar,
+  Scissors,
+  Pencil,
+  Globe,
+  Bell,
+  Mail,
+  Phone,
+  MessageSquare,
+} from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { SignOutButton } from "@/components/profile/sign-out-button";
 import { LANGUAGES } from "@/lib/i18n";
@@ -120,6 +130,11 @@ export default async function PerfilPage() {
           href="/reservar"
           icon={<Scissors size={18} className="text-muted" />}
           label={t("nav.book")}
+        />
+        <Row
+          href="/feedback"
+          icon={<MessageSquare size={18} className="text-muted" />}
+          label={t("feedback.title")}
         />
       </div>
 

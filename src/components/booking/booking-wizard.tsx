@@ -11,11 +11,16 @@ import {
 import { es, enUS } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Check, Loader2, Scissors, Sparkles, User, Users,
-  ShoppingBag, Minus, Plus, Timer, Wind, Droplet, CalendarDays, Clock,
+  ShoppingBag, Minus, Plus, Timer, Wind, Droplet, CalendarDays, Clock, Cake,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useT } from "@/components/i18n/language-provider";
+import {
+  birthdayDiscount,
+  DEFAULT_BIRTHDAY,
+  type BirthdaySettings,
+} from "@/lib/client-rules";
 import {
   GUEST_RELATIONSHIPS, WEEK_LABELS, generateSlots, fmtSlot, slotToDate, toMins,
   type AvailDay, type BusyInterval, type GuestRelationship,
@@ -137,6 +142,8 @@ export function BookingWizard({
   barberName = "Amado",
   barberAvatarUrl = null,
   shopAddress = null,
+  clientBirthDate = null,
+  birthdaySettings = DEFAULT_BIRTHDAY,
 }: {
   clientId: string;
   ownerName: string;
@@ -155,6 +162,9 @@ export function BookingWizard({
   barberName?: string;
   barberAvatarUrl?: string | null;
   shopAddress?: string | null;
+  /** Used for the birthday discount; null when they never gave it. */
+  clientBirthDate?: string | null;
+  birthdaySettings?: BirthdaySettings;
 }) {
   const router = useRouter();
   const { t, lang } = useT();
@@ -210,7 +220,19 @@ export function BookingWizard({
   const cartCount = cartItems.reduce((a, [, q]) => a + q, 0);
 
   const discount = discountFor(promotions, service, date, time);
-  const servicePrice = service ? service.price * (1 - discount / 100) : 0;
+  const promoPrice = service ? service.price * (1 - discount / 100) : 0;
+
+  /*
+   * The birthday comes off after the promotion, not instead of it — the
+   * banner on the home screen promises a birthday discount, so it has to
+   * survive whatever promotion is also running. It's computed against the
+   * appointment's own date, so booking a week out doesn't quietly grant a
+   * discount that will have expired by the time they sit down.
+   */
+  const birthdayOff = service
+    ? birthdayDiscount(promoPrice, service.id, clientBirthDate, birthdaySettings, date)
+    : 0;
+  const servicePrice = Math.max(0, promoPrice - birthdayOff);
   const grandTotal = servicePrice + cartTotal;
 
   const availableUseProducts = service?.service_products ?? [];
@@ -1232,7 +1254,20 @@ export function BookingWizard({
                   {t("booking.discount")} −{discount}%
                 </span>
                 <span className="text-sm font-bold text-success">
-                  −${(service!.price - servicePrice).toFixed(2)}
+                  −${(service!.price - promoPrice).toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {/* Listed on its own line so it's clear it stacked on top */}
+            {birthdayOff > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 bg-brand-light">
+                <span className="text-sm font-semibold text-brand flex items-center gap-1.5">
+                  <Cake size={14} />
+                  {t("birthday.discountApplied")}
+                </span>
+                <span className="text-sm font-bold text-brand">
+                  −${birthdayOff.toFixed(2)}
                 </span>
               </div>
             )}
