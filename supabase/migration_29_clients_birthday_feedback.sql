@@ -10,9 +10,14 @@
 ALTER TABLE public.clients
   ADD COLUMN IF NOT EXISTS birth_date date;
 
--- Buscar "quién cumple hoy" sin recorrer toda la tabla
+-- Buscar "quién cumple hoy" sin recorrer toda la tabla.
+-- Va por mes y día y no por to_char: dar formato a una fecha depende del
+-- DateStyle de la sesión, así que Postgres no la acepta en un índice.
 CREATE INDEX IF NOT EXISTS clients_birth_date_idx
-  ON public.clients ((to_char(birth_date, 'MM-DD')));
+  ON public.clients (
+    (EXTRACT(MONTH FROM birth_date)),
+    (EXTRACT(DAY   FROM birth_date))
+  );
 
 -- ── 2. Clientes creados por el barbero ──────────────────────
 -- Un walk-in es un perfil real sin cuenta: acumula citas, gastos e historial.
