@@ -84,9 +84,9 @@ export function RescheduleClient({
     if (!open) return;
     let alive = true;
     const supabase = createClient();
-    const [y, mo, d] = date.split("-").map(Number);
-    const dayStart = new Date(y, mo - 1, d, 0, 0, 0);
-    const dayEnd = new Date(y, mo - 1, d, 23, 59, 59);
+    // The shop's day, so the busy window matches the slots offered
+    const dayStart = shopDateAt(date, "00:00");
+    const dayEnd = new Date(dayStart.getTime() + 86_399_000);
     const ownStart = new Date(currentStartsAt).getTime();
     const ownEnd = new Date(currentEndsAt).getTime();
     supabase
