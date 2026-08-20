@@ -95,7 +95,7 @@ DECLARE
   r RECORD;
   v_send timestamptz;
 BEGIN
-  SELECT a.starts_at, a.status INTO v_starts, v_status
+  SELECT a.starts_at, a.status::text INTO v_starts, v_status
     FROM public.appointments a WHERE a.id = p_appointment_id;
 
   IF v_starts IS NULL THEN RETURN; END IF;
@@ -106,6 +106,12 @@ BEGIN
    WHERE appointment_id = p_appointment_id AND status = 'scheduled';
 
   -- Una cita cancelada o ya cerrada no vuelve a programar nada
+  /*
+   * Comparado como texto a propósito. `status` es un enum, y 'no_show' solo
+   * existe en él si se corrió la migración 18a. Nombrarlo como valor de enum
+   * rompe la migración entera en una base donde no está; comparar el texto
+   * funciona en las dos, y sigue funcionando si mañana se añade otro estado.
+   */
   IF v_status IN ('cancelada', 'completada', 'no_show') THEN RETURN; END IF;
 
   FOR r IN
@@ -161,7 +167,7 @@ BEGIN
   FOR a IN
     SELECT id FROM public.appointments
      WHERE starts_at > now()
-       AND status NOT IN ('cancelada', 'completada', 'no_show')
+       AND status::text NOT IN ('cancelada', 'completada', 'no_show')
   LOOP
     PERFORM public.reschedule_reminders(a.id);
   END LOOP;
@@ -205,7 +211,7 @@ BEGIN
        AND s.send_at <= now()
        -- Nunca un recordatorio de algo que ya ocurrió
        AND a.starts_at > now()
-       AND a.status NOT IN ('cancelada', 'completada', 'no_show')
+       AND a.status::text NOT IN ('cancelada', 'completada', 'no_show')
      ORDER BY s.send_at
      LIMIT p_limit
      -- Dos ejecuciones a la vez no se pisan
@@ -253,7 +259,7 @@ BEGIN
   FOR a IN
     SELECT id FROM public.appointments
      WHERE starts_at > now()
-       AND status NOT IN ('cancelada', 'completada', 'no_show')
+       AND status::text NOT IN ('cancelada', 'completada', 'no_show')
   LOOP
     PERFORM public.reschedule_reminders(a.id);
   END LOOP;

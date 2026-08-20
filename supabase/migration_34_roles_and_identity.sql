@@ -187,21 +187,21 @@ CREATE TRIGGER on_auth_user_created
 
 -- El barbero autorizado conserva (o recupera) su rol
 INSERT INTO public.user_roles (user_id, role)
-SELECT u.id, 'barber'
+SELECT u.id, 'barber'::public.app_role
   FROM auth.users u
   JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
 ON CONFLICT DO NOTHING;
 
 -- Cualquiera con ficha de cliente es cliente
 INSERT INTO public.user_roles (user_id, role)
-SELECT DISTINCT c.user_id, 'client'
+SELECT DISTINCT c.user_id, 'client'::public.app_role
   FROM public.clients c
  WHERE c.user_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
 -- Y quien no sea ni lo uno ni lo otro es cliente: se registró por la app
 INSERT INTO public.user_roles (user_id, role)
-SELECT u.id, 'client'
+SELECT u.id, 'client'::public.app_role
   FROM auth.users u
  WHERE NOT EXISTS (
          SELECT 1 FROM public.admin_allowlist a WHERE lower(a.email) = lower(u.email)
