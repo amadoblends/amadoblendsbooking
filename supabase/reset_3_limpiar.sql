@@ -73,7 +73,8 @@ DECLARE
   n bigint;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'scheduled_reminders', 'notification_events', 'notifications', 'feedback',
+    'scheduled_reminders', 'notification_events', 'notifications',
+    'client_notifications', 'client_preferences', 'feedback',
     'appointment_service_products', 'appointment_products', 'appointment_guests',
     'appointments', 'client_notes', 'clients',
     'blocked_times', 'closures', 'carousel_posts', 'promotions'

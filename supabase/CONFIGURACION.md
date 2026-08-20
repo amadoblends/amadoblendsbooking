@@ -8,44 +8,14 @@ equivocado. Van en orden de importancia.
 
 ## 1. El código de 6 dígitos (ahora llega un enlace)
 
-**Síntoma:** pides el código y te llega un correo de Supabase que dice
-*"Your sign-in link"* con un botón *Sign in*, en vez de seis dígitos.
+Las plantillas están escritas y listas para pegar en
+[`email-templates/`](email-templates/), con instrucciones en su propio
+README: las cuatro plantillas, los asuntos, y cómo dejar de enviar desde
+`noreply@mail.app.supabase.io`.
 
-**Por qué:** Supabase decide entre enlace y código **según la plantilla**. Si
-la plantilla no contiene `{{ .Token }}`, manda un enlace. La plantilla que
-tienes es la de fábrica y solo tiene `{{ .ConfirmationURL }}`.
-
-**Arreglo:** Supabase → **Authentication → Emails → Magic Link** → pega esto
-y guarda:
-
-```html
-<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-  <div style="text-align:center;margin-bottom:28px;">
-    <div style="display:inline-block;width:56px;height:56px;line-height:56px;border-radius:16px;background:#f2683c;color:#fff;font-size:26px;font-weight:800;">A</div>
-    <h1 style="margin:14px 0 0;font-size:21px;color:#14151a;">Amado Blends</h1>
-  </div>
-
-  <p style="font-size:15px;color:#6b6b75;text-align:center;margin:0 0 20px;">
-    Tu código de verificación es:
-  </p>
-
-  <div style="text-align:center;margin:0 0 24px;">
-    <span style="display:inline-block;padding:16px 32px;background:#f5f5f6;border-radius:14px;font-size:32px;font-weight:800;letter-spacing:.22em;color:#14151a;">{{ .Token }}</span>
-  </div>
-
-  <p style="font-size:13px;color:#6b6b75;text-align:center;line-height:1.6;margin:0;">
-    Vence en 1 hora y solo se puede usar una vez.<br>
-    Si no fuiste tú, ignora este correo.
-  </p>
-</div>
-```
-
-Haz lo mismo en **Confirm signup** (la misma plantilla sirve).
-
-> `{{ .Token }}` es la pieza obligatoria. Si la quitas, vuelve el enlace.
-
-**Comprobación:** regístrate con un correo nuevo. Debe llegar un correo con
-seis dígitos grandes, sin ningún botón de "Sign in".
+Lo esencial, por si no abres el otro archivo: Supabase manda un **código** si
+la plantilla contiene `{{ .Token }}`, y un **enlace** si no. La plantilla por
+defecto no lo tiene, y la app pide 6 dígitos — por eso no encajan.
 
 ---
 

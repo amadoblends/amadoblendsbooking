@@ -45,7 +45,8 @@ FROM unnest(ARRAY[
   'appointments', 'appointment_products', 'appointment_guests',
   'appointment_service_products', 'clients', 'client_notes',
   'blocked_times', 'closures', 'carousel_posts', 'promotions',
-  'notifications', 'notification_events', 'feedback',
+  'notifications', 'notification_events', 'client_notifications',
+  'client_preferences', 'feedback',
   'push_subscriptions', 'scheduled_reminders'
 ]) AS t
 ORDER BY t;
