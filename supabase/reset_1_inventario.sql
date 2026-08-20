@@ -7,62 +7,79 @@
 --   reset_1_inventario.sql   ← estás aquí: mirar
 --   reset_2_respaldo.sql     ← exportar antes de tocar nada
 --   reset_3_limpiar.sql      ← borrar, ya sabiendo qué
+--
+-- Funciona esté la base como esté: una tabla que aún no existe sale como
+-- "(falta la migración)" en vez de reventar la consulta entera.
 -- ============================================================
 
+-- ── Cuántas filas tiene una tabla, exista o no ──────────────
+/*
+ * to_regclass devuelve NULL en vez de fallar cuando la tabla no está, así
+ * que este inventario se puede correr en cualquier momento. La primera
+ * versión nombraba las tablas directamente y moría con
+ * «relation does not exist», que no dice qué hacer.
+ */
+CREATE OR REPLACE FUNCTION pg_temp.filas(p_tabla text)
+RETURNS text LANGUAGE plpgsql AS $$
+DECLARE n bigint;
+BEGIN
+  IF to_regclass('public.' || p_tabla) IS NULL THEN
+    RETURN '(falta la migración)';
+  END IF;
+  EXECUTE format('SELECT count(*) FROM public.%I', p_tabla) INTO n;
+  RETURN n::text;
+END $$;
+
 -- ── Qué se CONSERVA (configuración del negocio) ─────────────
-SELECT 'SE CONSERVA' AS accion, tabla, filas FROM (
-  SELECT 'business_settings' AS tabla, count(*) AS filas FROM public.business_settings
-  UNION ALL SELECT 'booking_settings',  count(*) FROM public.booking_settings
-  UNION ALL SELECT 'availability',      count(*) FROM public.availability
-  UNION ALL SELECT 'services',          count(*) FROM public.services
-  UNION ALL SELECT 'products',          count(*) FROM public.products
-  UNION ALL SELECT 'reminder_rules',    count(*) FROM public.reminder_rules
-  UNION ALL SELECT 'profiles (barbero)', count(*) FROM public.profiles
-  UNION ALL SELECT 'user_roles',        count(*) FROM public.user_roles
-  UNION ALL SELECT 'admin_allowlist',   count(*) FROM public.admin_allowlist
-) t ORDER BY tabla;
+SELECT 'SE CONSERVA' AS accion, t AS tabla, pg_temp.filas(t) AS filas
+FROM unnest(ARRAY[
+  'business_settings', 'booking_settings', 'availability',
+  'services', 'products', 'reminder_rules',
+  'profiles', 'user_roles', 'admin_allowlist'
+]) AS t
+ORDER BY t;
 
 -- ── Qué se BORRA (datos de prueba) ──────────────────────────
-SELECT 'SE BORRA' AS accion, tabla, filas FROM (
-  SELECT 'appointments' AS tabla, count(*) AS filas FROM public.appointments
-  UNION ALL SELECT 'clients',              count(*) FROM public.clients
-  UNION ALL SELECT 'client_notes',         count(*) FROM public.client_notes
-  UNION ALL SELECT 'blocked_times',        count(*) FROM public.blocked_times
-  UNION ALL SELECT 'closures',             count(*) FROM public.closures
-  UNION ALL SELECT 'carousel_posts',       count(*) FROM public.carousel_posts
-  UNION ALL SELECT 'promotions',           count(*) FROM public.promotions
-  UNION ALL SELECT 'notifications',        count(*) FROM public.notifications
-  UNION ALL SELECT 'notification_events',  count(*) FROM public.notification_events
-  UNION ALL SELECT 'feedback',             count(*) FROM public.feedback
-  UNION ALL SELECT 'push_subscriptions',   count(*) FROM public.push_subscriptions
-) t ORDER BY tabla;
+SELECT 'SE BORRA' AS accion, t AS tabla, pg_temp.filas(t) AS filas
+FROM unnest(ARRAY[
+  'appointments', 'appointment_products', 'appointment_guests',
+  'appointment_service_products', 'clients', 'client_notes',
+  'blocked_times', 'closures', 'carousel_posts', 'promotions',
+  'notifications', 'notification_events', 'feedback',
+  'push_subscriptions', 'scheduled_reminders'
+]) AS t
+ORDER BY t;
 
 -- ── Las cuentas ─────────────────────────────────────────────
--- Comprueba con tus ojos que la línea de amadoblends@gmail.com dice CONSERVAR
+/*
+ * Antes de la migración 34 no existe admin_allowlist, así que el correo
+ * autorizado se compara contra la constante. Después manda la tabla.
+ */
 SELECT
   u.email,
   CASE
-    WHEN EXISTS (SELECT 1 FROM public.admin_allowlist a WHERE lower(a.email) = lower(u.email))
-      THEN '✅ CONSERVAR — barbero autorizado'
+    WHEN to_regclass('public.admin_allowlist') IS NOT NULL
+      THEN CASE WHEN EXISTS (
+             SELECT 1 FROM public.admin_allowlist a
+              WHERE lower(a.email) = lower(u.email))
+           THEN '✅ CONSERVAR — barbero autorizado'
+           ELSE '🗑️  BORRAR — cuenta de prueba' END
+    WHEN lower(u.email) = 'amadoblends@gmail.com'
+      THEN '✅ CONSERVAR — barbero (aún sin migración 34)'
     ELSE '🗑️  BORRAR — cuenta de prueba'
   END AS accion,
-  u.created_at::date AS creada,
+  u.created_at::date      AS creada,
   u.last_sign_in_at::date AS ultimo_acceso
 FROM auth.users u
-ORDER BY
-  EXISTS (SELECT 1 FROM public.admin_allowlist a WHERE lower(a.email) = lower(u.email)) DESC,
-  u.created_at;
+ORDER BY lower(u.email) = 'amadoblends@gmail.com' DESC, u.created_at;
 
--- ── Aviso si algo no cuadra ─────────────────────────────────
-/*
- * Si esto devuelve una fila, PARA: no hay ninguna cuenta autorizada, y la
- * limpieza te dejaría sin forma de entrar al panel. Corre antes la
- * migración 34, y comprueba que amadoblends@gmail.com existe en auth.users.
- */
-SELECT '⛔ PARA — no hay ninguna cuenta de barbero que conservar' AS aviso
+-- ── Avisos ──────────────────────────────────────────────────
+SELECT '⚠️  Falta la migración 34 — córrela antes de limpiar' AS aviso
+WHERE to_regclass('public.user_roles') IS NULL
+UNION ALL
+SELECT '⛔ PARA — amadoblends@gmail.com no existe en auth.users'
 WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users u
-  JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
+  SELECT 1 FROM auth.users WHERE lower(email) = 'amadoblends@gmail.com'
 );
 
 -- ── Qué se lleva por delante cada borrado (claves foráneas) ─
@@ -71,10 +88,10 @@ WHERE NOT EXISTS (
  * haya sorpresas: no queda ningún huérfano, y no hace falta borrarlo a mano.
  */
 SELECT
-  tc.table_name       AS tabla_hija,
-  kcu.column_name     AS columna,
-  ccu.table_name      AS depende_de,
-  rc.delete_rule      AS al_borrar
+  tc.table_name   AS tabla_hija,
+  kcu.column_name AS columna,
+  ccu.table_name  AS depende_de,
+  rc.delete_rule  AS al_borrar
 FROM information_schema.table_constraints tc
 JOIN information_schema.key_column_usage kcu
   ON kcu.constraint_name = tc.constraint_name AND kcu.constraint_schema = tc.constraint_schema

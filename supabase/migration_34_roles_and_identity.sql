@@ -254,8 +254,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS clients_user_id_key
   ON public.clients (user_id) WHERE user_id IS NOT NULL;
 
 -- ── 8. Nadie se hace admin escribiendo en profiles ──────────
-DROP POLICY IF EXISTS "profiles_admin_all" ON public.profiles;
-DROP POLICY IF EXISTS "profiles_self" ON public.profiles;
+/*
+ * Se borran TODAS antes de crearlas, incluidas las que se van a crear.
+ *
+ * `profiles_self_update` y `profiles_self_select` ya venían de schema.sql.
+ * Crear una que ya existe aborta la migración entera —y como el editor de
+ * Supabase la envuelve en una transacción, se deshace todo lo anterior: las
+ * tablas de roles no llegaban a quedar creadas. Con el DROP delante, esta
+ * migración se puede correr las veces que haga falta.
+ */
+DROP POLICY IF EXISTS "profiles_admin_all"   ON public.profiles;
+DROP POLICY IF EXISTS "profiles_self"        ON public.profiles;
+DROP POLICY IF EXISTS "profiles_self_select" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_self_read"   ON public.profiles;
+DROP POLICY IF EXISTS "profiles_self_update" ON public.profiles;
 
 CREATE POLICY "profiles_self_read" ON public.profiles
   FOR SELECT USING (id = auth.uid());

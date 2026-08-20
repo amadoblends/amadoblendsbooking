@@ -17,17 +17,31 @@
 -- una transacción, así que un fallo a mitad no deja la base a medias.
 -- ============================================================
 
--- ── Freno de seguridad ──────────────────────────────────────
+-- ── Frenos de seguridad ─────────────────────────────────────
 /*
- * Si no hay una cuenta de barbero que conservar, esto para en seco. Sin
- * ella la limpieza te dejaría fuera de tu propio panel.
+ * Primero: la migración 34 tiene que estar corrida.
+ *
+ * Sin ella no existe admin_allowlist, y este script no tendría forma de
+ * saber qué cuenta conservar. Se comprueba con to_regclass para que el aviso
+ * diga qué hacer, en vez de un «relation does not exist» a media ejecución.
+ */
+DO $$ BEGIN
+  IF to_regclass('public.admin_allowlist') IS NULL THEN
+    RAISE EXCEPTION
+      'Falta la migración 34: sin admin_allowlist no sé qué cuenta conservar. Córrela primero.';
+  END IF;
+END $$;
+
+/*
+ * Segundo: tiene que haber una cuenta de barbero que conservar. Sin ella la
+ * limpieza te dejaría fuera de tu propio panel.
  */
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM auth.users u
     JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
   ) THEN
-    RAISE EXCEPTION 'No hay ninguna cuenta de barbero autorizada. Corre la migración 34 primero.';
+    RAISE EXCEPTION 'No hay ninguna cuenta de barbero autorizada en admin_allowlist.';
   END IF;
 END $$;
 
@@ -48,31 +62,42 @@ END $$;
  * El orden va de hijo a padre. La mayoría caería igual por CASCADE, pero
  * escribirlo explícito hace que se lea qué desaparece y en qué orden, en vez
  * de confiar en que las claves foráneas estén todas bien puestas.
+ *
+ * Se salta lo que no existe. Varias de estas tablas llegan con migraciones
+ * distintas, y nombrar una que falta abortaría la limpieza entera dejando
+ * medio borrado el resto.
  */
-DELETE FROM public.scheduled_reminders;
-DELETE FROM public.notification_events;
-DELETE FROM public.notifications;
-DELETE FROM public.feedback;
-
-DELETE FROM public.appointment_service_products;
-DELETE FROM public.appointment_products;
-DELETE FROM public.appointment_guests;
-DELETE FROM public.appointments;
-
-DELETE FROM public.client_notes;
-DELETE FROM public.clients;
-
-DELETE FROM public.blocked_times;
-DELETE FROM public.closures;
-DELETE FROM public.carousel_posts;
-DELETE FROM public.promotions;
+DO $$
+DECLARE
+  t text;
+  n bigint;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'scheduled_reminders', 'notification_events', 'notifications', 'feedback',
+    'appointment_service_products', 'appointment_products', 'appointment_guests',
+    'appointments', 'client_notes', 'clients',
+    'blocked_times', 'closures', 'carousel_posts', 'promotions'
+  ] LOOP
+    IF to_regclass('public.' || t) IS NULL THEN
+      RAISE NOTICE 'omitida % (no existe todavía)', t;
+      CONTINUE;
+    END IF;
+    EXECUTE format('DELETE FROM public.%I', t);
+    GET DIAGNOSTICS n = ROW_COUNT;
+    RAISE NOTICE 'borradas % filas de %', n, t;
+  END LOOP;
+END $$;
 
 -- Los dispositivos de los clientes de prueba; el del barbero se conserva
-DELETE FROM public.push_subscriptions
- WHERE user_id NOT IN (
-   SELECT u.id FROM auth.users u
-   JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
- );
+DO $$ BEGIN
+  IF to_regclass('public.push_subscriptions') IS NOT NULL THEN
+    DELETE FROM public.push_subscriptions
+     WHERE user_id NOT IN (
+       SELECT u.id FROM auth.users u
+       JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
+     );
+  END IF;
+END $$;
 
 -- ── 2. Las cuentas de prueba ────────────────────────────────
 /*
@@ -88,8 +113,16 @@ DELETE FROM auth.users u
  );
 
 -- ── 3. Los contadores vuelven a cero ────────────────────────
-UPDATE public.profiles
-   SET citas_seen_at = now(), feedback_seen_at = now();
+-- Las columnas llegan con la migración 30; sin ella no hay nada que poner a cero
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'profiles'
+       AND column_name = 'citas_seen_at'
+  ) THEN
+    UPDATE public.profiles SET citas_seen_at = now(), feedback_seen_at = now();
+  END IF;
+END $$;
 
 -- ── 4. Comprobación de integridad ───────────────────────────
 /*

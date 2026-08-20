@@ -1,5 +1,9 @@
 # Empezar de cero sin romper nada
 
+> **Antes de nada:** corre `migration_34_roles_and_identity.sql`. Sin ella no
+> existe `admin_allowlist`, y los scripts no tienen forma de saber qué cuenta
+> conservar. `reset_1` te lo avisa; `reset_3` se niega a arrancar.
+
 Tres archivos, en este orden. El primero solo mira, el segundo guarda, y solo
 el tercero borra.
 
