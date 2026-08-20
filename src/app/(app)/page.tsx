@@ -16,6 +16,7 @@ import { getT } from "@/lib/session";
 import { isBirthdayToday, isInBirthdayWindow } from "@/lib/client-rules";
 import { getBirthdaySettings } from "@/lib/data/birthday";
 import { CompleteBirthDate } from "@/components/profile/complete-birth-date";
+import { RateVisit, type AwaitingVisit } from "@/components/feedback/rate-visit";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -59,6 +60,17 @@ export default async function HomePage() {
 
   const firstName = client.full_name.split(" ")[0];
   const { t, lang } = await getT();
+
+  /*
+   * The last finished visit they haven't rated. Asked here because it's the
+   * screen they open anyway, a day or two after the haircut — the feedback
+   * screen in the profile is where a rating goes to never be given.
+   * Degrades to nothing before migration 36.
+   */
+  const { data: awaiting } = await supabase.rpc("visit_awaiting_rating");
+  const awaitingVisit = (Array.isArray(awaiting) ? awaiting[0] : awaiting) as
+    | AwaitingVisit
+    | undefined;
 
   const isBirthday = isBirthdayToday(client.birth_date);
   // The gift banner runs the whole window; the greeting only on the day
@@ -113,6 +125,8 @@ export default async function HomePage() {
         * it did are asked here rather than being locked out of their own app.
         */}
       {!client.birth_date && <CompleteBirthDate clientId={client.id} />}
+
+      {awaitingVisit && <RateVisit visit={awaitingVisit} clientId={client.id} />}
 
       {/* Promotions, closures and announcements managed from the admin panel */}
       <HeroCarousel posts={carouselPosts} lang={lang} />

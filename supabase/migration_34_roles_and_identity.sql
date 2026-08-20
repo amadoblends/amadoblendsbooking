@@ -192,12 +192,43 @@ SELECT u.id, 'barber'::public.app_role
   JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
 ON CONFLICT DO NOTHING;
 
--- Cualquiera con ficha de cliente es cliente
+/*
+ * Cualquiera con ficha de cliente es cliente — MENOS el barbero.
+ *
+ * Si durante las pruebas se creó una ficha de cliente con la cuenta del
+ * barbero, sin esta exclusión acabaría teniendo los dos roles y podría
+ * entrar en la app de clientes. La cuenta de Amado Blends es solo de
+ * barbero; el día que quiera reservarse a sí mismo, el rol se añade a mano
+ * y a propósito (ver el final de este archivo).
+ */
 INSERT INTO public.user_roles (user_id, role)
 SELECT DISTINCT c.user_id, 'client'::public.app_role
   FROM public.clients c
  WHERE c.user_id IS NOT NULL
+   AND NOT EXISTS (
+     SELECT 1
+       FROM auth.users u
+       JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
+      WHERE u.id = c.user_id
+   )
 ON CONFLICT DO NOTHING;
+
+/*
+ * Y si esa ficha existe, se le suelta la cuenta.
+ *
+ * No se borra: puede tener citas e historial detrás. Queda como un perfil
+ * sin dueño —un walk-in— que es exactamente lo que era. Así la cuenta del
+ * barbero no arrastra una identidad de cliente que nadie decidió darle.
+ */
+UPDATE public.clients c
+   SET user_id = NULL
+ WHERE c.user_id IS NOT NULL
+   AND EXISTS (
+     SELECT 1
+       FROM auth.users u
+       JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
+      WHERE u.id = c.user_id
+   );
 
 -- Y quien no sea ni lo uno ni lo otro es cliente: se registró por la app
 INSERT INTO public.user_roles (user_id, role)
@@ -295,9 +326,30 @@ CREATE POLICY "clients_self_insert" ON public.clients
     OR public.is_admin()
   );
 
--- ── 10. Qué quedó ───────────────────────────────────────────
+-- ── 10. Si algún día el barbero quiere reservarse a sí mismo ─
+/*
+ * Hoy la cuenta de Amado Blends es SOLO de barbero, para que se pueda
+ * probar el registro de cliente desde cero con otro correo.
+ *
+ * El día que haga falta, esto le añade el rol de cliente sin duplicar la
+ * cuenta ni tocar nada más. Es una decisión explícita, no un accidente:
+ *
+ *   INSERT INTO public.user_roles (user_id, role)
+ *   SELECT id, 'client'::public.app_role FROM auth.users
+ *    WHERE lower(email) = 'amadoblends@gmail.com'
+ *   ON CONFLICT DO NOTHING;
+ */
+
+-- ── 11. Qué quedó ───────────────────────────────────────────
 SELECT
   (SELECT count(*) FROM public.user_roles WHERE role = 'barber') AS barberos,
   (SELECT count(*) FROM public.user_roles WHERE role = 'client') AS clientes,
   (SELECT count(*) FROM public.profiles)                          AS perfiles_barbero,
   'migración 34 lista'                                            AS resultado;
+
+-- Comprueba que la cuenta del barbero tiene UN solo rol: barber
+SELECT u.email, r.role
+  FROM auth.users u
+  JOIN public.user_roles r ON r.user_id = u.id
+  JOIN public.admin_allowlist a ON lower(a.email) = lower(u.email)
+ ORDER BY r.role;

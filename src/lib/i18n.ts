@@ -240,6 +240,17 @@ const dict = {
   "feedback.sendAnother": { es: "Enviar otro comentario", en: "Send another" },
   "feedback.yours": { es: "Tus comentarios", en: "Your feedback" },
 
+  // Rating a visit
+  "rate.title": { es: "¿Cómo estuvo tu visita?", en: "How was your visit?" },
+  "rate.notePlaceholder": {
+    es: "¿Quieres contarnos algo más? (opcional)",
+    en: "Anything else you'd like to say? (optional)",
+  },
+  "rate.privateHint": {
+    es: "Solo lo ve tu barbero.",
+    en: "Only your barber sees this.",
+  },
+
   // Birthday
   "birthday.happy": { es: "¡Feliz cumpleaños", en: "Happy birthday" },
   "birthday.gift": { es: "Tienes un regalo esperándote", en: "You have a gift waiting" },
