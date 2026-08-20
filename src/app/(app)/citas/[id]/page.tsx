@@ -31,12 +31,18 @@ export default async function CitaDetailPage({
 
   if (!client) redirect("/configurar-perfil");
 
-  const [{ data: apt }, { data: aptProducts }, { data: guests }, { data: availability }, { data: settings }] =
-    await Promise.all([
+  const [
+    { data: apt },
+    { data: aptProducts },
+    { data: guests },
+    { data: availability },
+    { data: settings },
+    { data: closures },
+  ] = await Promise.all([
       supabase
         .from("appointments")
         .select(
-          "id, starts_at, ends_at, status, price, notes, services(name, color, duration_minutes)"
+          "id, starts_at, ends_at, status, price, notes, extra_minutes, services(name, color, duration_minutes)"
         )
         .eq("id", id)
         .eq("client_id", client.id)
@@ -50,7 +56,16 @@ export default async function CitaDetailPage({
         .select("id, full_name, phone, services(name)")
         .eq("appointment_id", id),
       supabase.from("availability").select("*").order("weekday"),
-      supabase.from("booking_settings").select("booking_window_days").eq("id", 1).single(),
+      supabase
+        .from("booking_settings")
+        .select("booking_window_days, min_notice_minutes, buffer_minutes")
+        .eq("id", 1)
+        .single(),
+      // Vacations and holidays, so a shut day is never offered
+      supabase
+        .from("closures")
+        .select("starts_on, ends_on, all_day, start_time, end_time")
+        .gte("ends_on", new Date().toISOString().slice(0, 10)),
     ]);
 
   if (!apt) notFound();
@@ -157,9 +172,13 @@ export default async function CitaDetailPage({
           appointmentId={apt.id}
           currentStartsAt={apt.starts_at}
           currentEndsAt={apt.ends_at}
-          durationMinutes={svc.duration_minutes}
+          // The whole visit, products included — not just the base service
+          durationMinutes={svc.duration_minutes + (apt.extra_minutes ?? 0)}
           availability={availability ?? []}
           bookingWindowDays={settings?.booking_window_days ?? 30}
+          closures={closures ?? []}
+          bufferMinutes={settings?.buffer_minutes ?? 0}
+          minNoticeMinutes={settings?.min_notice_minutes ?? 0}
         />
       )}
 

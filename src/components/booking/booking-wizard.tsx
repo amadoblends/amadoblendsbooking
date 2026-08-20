@@ -285,8 +285,12 @@ export function BookingWizard({
       intervalMinutes: slotIntervalMinutes,
       bufferMinutes,
       optimizeGaps,
+      // The calendar already greys closed days out; passing them here means
+      // the times themselves agree, so a closure can't leave a bookable hour
+      // behind on a shut afternoon.
+      closures,
     }),
-    [slotIntervalMinutes, bufferMinutes, optimizeGaps]
+    [slotIntervalMinutes, bufferMinutes, optimizeGaps, closures]
   );
 
   // Steps that actually apply to this booking
@@ -1063,8 +1067,14 @@ export function BookingWizard({
                 const inMonth = isSameMonth(d, calCursor);
                 const capacity = dayCapacity(d);
                 const closed = closureForDate(dayKey, closures);
+                /*
+                 * Only a whole-day closure closes the day. An afternoon
+                 * closure used to grey out the morning too, hiding hours that
+                 * were genuinely bookable; the capacity check below already
+                 * removes the day if nothing actually fits.
+                 */
                 const disabled =
-                  !!closed ||
+                  closed?.all_day === true ||
                   !activeWeekdays.has(d.getDay()) ||
                   isBefore(startOfDay(d), today) ||
                   isAfter(startOfDay(d), maxDate) ||
@@ -1076,8 +1086,9 @@ export function BookingWizard({
                   <button
                     key={d.toISOString()}
                     onClick={() => {
-                      // A closed day explains itself rather than doing nothing
-                      if (closed) {
+                      // A day that can't be booked explains why rather than
+                      // doing nothing when tapped
+                      if (closed && (closed.all_day || capacity === 0)) {
                         setOpenClosure(closed);
                         return;
                       }

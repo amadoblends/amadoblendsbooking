@@ -14,6 +14,12 @@ import { createClient } from "@/lib/supabase/client";
 import { shopDateAt } from "@/lib/timezone";
 import { notifyBookingRescheduled } from "@/lib/actions/notify";
 import { cn } from "@/lib/utils";
+import {
+  availableSlots,
+  isDayClosed,
+  type BusyInterval,
+  type ClosureLike,
+} from "@/lib/availability-slots";
 
 const WEEK_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
 
@@ -25,11 +31,6 @@ interface AvailDay {
   break_start_time: string | null;
   break_end_time: string | null;
   slot_minutes: number;
-}
-
-interface BusyInterval {
-  start: number;
-  end: number;
 }
 
 function toMins(t: string) {
@@ -53,13 +54,20 @@ export function RescheduleClient({
   durationMinutes,
   availability,
   bookingWindowDays,
+  closures = [],
+  bufferMinutes = 0,
+  minNoticeMinutes = 0,
 }: {
   appointmentId: string;
   currentStartsAt: string;
   currentEndsAt: string;
+  /** The whole visit including anything the products add. */
   durationMinutes: number;
   availability: AvailDay[];
   bookingWindowDays: number;
+  closures?: ClosureLike[];
+  bufferMinutes?: number;
+  minNoticeMinutes?: number;
 }) {
   const router = useRouter();
   // Day and month names follow the client's language
@@ -114,26 +122,23 @@ export function RescheduleClient({
     };
   }, [date, open, currentStartsAt, currentEndsAt]);
 
-  const slots = useMemo(() => {
-    if (!dayAvail) return [];
-    const start = toMins(dayAvail.start_time);
-    const end = toMins(dayAvail.end_time);
-    const step = dayAvail.slot_minutes;
-    const bS = dayAvail.break_start_time ? toMins(dayAvail.break_start_time) : null;
-    const bE = dayAvail.break_end_time ? toMins(dayAvail.break_end_time) : null;
-    const [y, mo, d] = date.split("-").map(Number);
-    const now = Date.now();
-    const out: string[] = [];
-    for (let t = start; t + durationMinutes <= end; t += step) {
-      if (bS !== null && bE !== null && t < bE && t + durationMinutes > bS) continue;
-      const sMs = new Date(y, mo - 1, d, Math.floor(t / 60), t % 60, 0).getTime();
-      if (sMs < now) continue;
-      const eMs = sMs + durationMinutes * 60000;
-      if (busy.some((b) => sMs < b.end && eMs > b.start)) continue;
-      out.push(fromMins(t));
-    }
-    return out;
-  }, [dayAvail, date, busy, durationMinutes]);
+  /*
+   * The same rule the barber's calendar uses. This screen used to build its
+   * own list in the device's timezone, with no buffer, no minimum notice and
+   * no idea about closures — so it offered times that were then refused.
+   */
+  const slots = useMemo(
+    () =>
+      availableSlots({
+        dateStr: date,
+        day: dayAvail,
+        durationMinutes,
+        busy,
+        closures,
+        rules: { bufferMinutes, minNoticeMinutes },
+      }),
+    [dayAvail, date, busy, durationMinutes, closures, bufferMinutes, minNoticeMinutes]
+  );
 
   async function handleSave() {
     if (!time) return;

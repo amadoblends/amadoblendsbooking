@@ -70,7 +70,7 @@ export default async function ReservarPage({
   // Closures explain why a day is unavailable instead of just greying it out
   const { data: closures } = await supabase
     .from("closures")
-    .select("id, starts_on, ends_on, reason, description")
+    .select("id, starts_on, ends_on, reason, description, all_day, start_time, end_time")
     .gte("ends_on", todayISO)
     .order("starts_on");
 

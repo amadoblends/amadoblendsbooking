@@ -11,6 +11,14 @@ export interface ClientClosure {
   ends_on: string;
   reason: string;
   description: string | null;
+  /**
+   * A closure can shut the whole day or only part of it. Without these the
+   * client's app treated an afternoon closure as if the shop were shut all
+   * day, hiding a morning that was genuinely bookable.
+   */
+  all_day: boolean;
+  start_time: string | null;
+  end_time: string | null;
 }
 
 const REASON_LABELS: Record<string, { es: string; en: string; emoji: string }> = {

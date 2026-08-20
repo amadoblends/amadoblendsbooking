@@ -38,7 +38,10 @@ const BANNED = [
     why: "date-fns format() uses the runtime's timezone — use shopFormat() / shopTime()",
   },
   {
-    re: /new Date\(\s*\w+\s*,\s*\w+\s*-\s*1\s*,\s*\w+\s*,\s*\w+\s*,\s*\w+/,
+    // The hour and minute are often expressions, not plain names — the
+    // reschedule modals passed Math.floor(t / 60) and slipped through a
+    // pattern that only matched \w+.
+    re: /new Date\(\s*[^,()]+\s*,\s*[^,()]*-\s*1\s*,\s*[^,()]+\s*,\s*[^,]+\s*,/,
     why: "new Date(y, m, d, h, mi) builds in the device's timezone — use shopDateAt()",
   },
 ];
