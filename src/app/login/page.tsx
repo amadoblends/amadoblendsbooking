@@ -47,7 +47,23 @@ function LoginPageInner() {
   const [otp, setOtp] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(params.get("error"));
+  /*
+   * The callback redirects here with a code, not a sentence — showing it raw
+   * put strings like "barber_account" in front of the person. The ones we
+   * send ourselves get real wording; anything from Supabase passes through,
+   * since it's already a message.
+   */
+  const [error, setError] = useState<string | null>(() => {
+    const raw = params.get("error");
+    if (!raw) return null;
+    const known: Record<string, string> = {
+      barber_account:
+        "Esta cuenta es de un barbero. Inicia sesión desde la app del barbero.",
+      missing_code: "Ese enlace ya no es válido. Pide uno nuevo.",
+      auth_failed: "No pudimos verificar ese enlace. Inténtalo de nuevo.",
+    };
+    return known[raw] ?? raw;
+  });
   const [notice, setNotice] = useState<string | null>(null);
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   /** A walk-in profile the barber already made for this person. */

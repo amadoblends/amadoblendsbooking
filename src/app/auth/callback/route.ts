@@ -34,6 +34,22 @@ export async function GET(request: Request) {
     );
   }
 
+  /*
+   * A barber's account must not pick up a client profile here.
+   *
+   * This route creates one for anyone who arrives without it — which is
+   * right for a new client signing in with Google or a magic link, and wrong
+   * for the barber, who would quietly end up holding both roles. The
+   * database refuses the insert after migration 34, but that surfaces as a
+   * confusing redirect to "finish your profile"; better to say what happened.
+   */
+  const { data: roleRows } = await supabase.rpc("my_roles");
+  const roles = Array.isArray(roleRows) ? roleRows[0] : roleRows;
+  if (roles?.is_barber && !roles?.is_client) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${baseUrl}/login?error=barber_account`);
+  }
+
   // Google users have no client record yet — create it from their profile
   const { data: existing } = await supabase
     .from("clients")

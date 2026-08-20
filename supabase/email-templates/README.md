@@ -9,7 +9,20 @@ Asunto:  Your sign-in link                              ← la plantilla
 ```
 
 La **plantilla** es el contenido y el idioma. El **remitente** es de quién
-parece venir. Se cambian en sitios distintos.
+parece venir.
+
+> ## ⚠️ El SMTP va PRIMERO
+>
+> Supabase ya no deja editar las plantillas sin SMTP propio. En
+> *Authentication → Emails* verás:
+>
+> > *Set up custom SMTP to edit templates — Emails will be sent using the
+> > default templates.*
+>
+> Los campos de Subject y Body están bloqueados hasta que lo configures. No
+> es un paso opcional que puedas dejar para después: es el requisito.
+>
+> **Ve al punto 2 primero, y luego vuelve al 1.**
 
 ---
 
@@ -78,19 +91,32 @@ Resend**. No puede ser `amadoblends@gmail.com`, por lo mismo que ya vimos con
 los correos de citas: nadie puede firmar correo de gmail.com, y Gmail trata
 como suplantación lo que llegue así.
 
-Mientras no tengas dominio verificado, el remitente compartido de Supabase
-funciona y llega. Es feo, pero llega — y con las plantillas puestas, el
-contenido ya es tuyo aunque el remitente todavía no lo sea.
+### Necesitas un dominio. No hay atajo.
 
-### Por qué merece la pena hacerlo igualmente
+Para verificar un dominio en Resend hace falta tener uno. Cuesta unos 10–12
+dólares al año en Namecheap, Cloudflare o Porkbun, y desbloquea de una vez
+las cuatro cosas que hoy están a medias:
 
-El servidor compartido de Supabase tiene **límite de 2 correos por hora** en
-el plan gratuito. Con dos personas registrándose seguidas ya se agota, y los
-siguientes no llegan — sin aviso ni error visible. Con tu propio SMTP ese
-límite desaparece.
+| | Sin dominio | Con dominio |
+|---|---|---|
+| Editar las plantillas | ❌ bloqueado por Supabase | ✅ |
+| Remitente | `noreply@mail.app.supabase.io` | `Amado Blends <citas@…>` |
+| Correos de citas | remitente de pruebas | ✅ firmados |
+| Límite de envío | **2 por hora** | el de Resend (3.000/mes gratis) |
 
-Si estás probando el registro varias veces, ese límite es lo primero que te
-va a morder.
+El `onboarding@resend.dev` de Resend **no sirve** para esto: solo puede
+enviar al correo con el que creaste la cuenta de Resend, así que no puedes
+probar el registro de un cliente con otra dirección.
+
+### Mientras tanto, ¿funciona el registro?
+
+Sí, con el enlace. Llega *"Your sign-in link"* en inglés y sin marca, pero al
+tocarlo entra: la app tiene una ruta que procesa el enlace y crea la cuenta
+igual. El código de 6 dígitos es lo único que no puede funcionar todavía, y
+la pantalla de login ya lo dice.
+
+**El límite de 2 correos por hora es lo que te va a molestar de verdad** al
+probar. Dos registros seguidos y el tercero no llega, sin aviso ni error.
 
 ---
 
