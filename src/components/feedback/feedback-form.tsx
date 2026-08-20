@@ -6,6 +6,7 @@ import { MessageSquare, Smartphone, Scissors, Check, Loader2, Star } from "lucid
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/components/i18n/language-provider";
+import { categoriesFor } from "@/lib/feedback-categories";
 
 type Area = "app" | "service";
 
@@ -17,8 +18,9 @@ type Area = "app" | "service";
  */
 export function FeedbackForm({ clientId }: { clientId: string }) {
   const router = useRouter();
-  const { t } = useT();
+  const { t, lang } = useT();
   const [area, setArea] = useState<Area | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [rating, setRating] = useState<number | null>(null);
   const [sent, setSent] = useState(false);
@@ -26,13 +28,14 @@ export function FeedbackForm({ clientId }: { clientId: string }) {
   const [isPending, startTransition] = useTransition();
 
   async function submit() {
-    if (!area || message.trim().length < 3) return;
+    if (!area || !category || message.trim().length < 3) return;
     setError(null);
 
     const supabase = createClient();
     const { error: err } = await supabase.from("feedback").insert({
       client_id: clientId,
       area,
+      category,
       message: message.trim(),
       // Rating only makes sense for the service itself
       rating: area === "service" ? rating : null,
@@ -60,6 +63,7 @@ export function FeedbackForm({ clientId }: { clientId: string }) {
           onClick={() => {
             setSent(false);
             setArea(null);
+            setCategory(null);
             setMessage("");
             setRating(null);
           }}
@@ -78,20 +82,50 @@ export function FeedbackForm({ clientId }: { clientId: string }) {
         <div className="grid grid-cols-2 gap-2">
           <AreaButton
             active={area === "service"}
-            onClick={() => setArea("service")}
+            onClick={() => {
+              setArea("service");
+              setCategory(null);
+            }}
             icon={<Scissors size={20} />}
             label={t("feedback.areaService")}
             hint={t("feedback.areaServiceHint")}
           />
           <AreaButton
             active={area === "app"}
-            onClick={() => setArea("app")}
+            onClick={() => {
+              setArea("app");
+              setCategory(null);
+            }}
             icon={<Smartphone size={20} />}
             label={t("feedback.areaApp")}
             hint={t("feedback.areaAppHint")}
           />
         </div>
       </div>
+
+      {area && (
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-2">{t("feedback.category")}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {categoriesFor(area).map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setCategory(c.value)}
+                className={cn(
+                  "h-11 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]",
+                  category === c.value
+                    ? "border-brand bg-brand-light text-brand"
+                    : "border-border bg-surface text-foreground"
+                )}
+              >
+                <span aria-hidden>{c.emoji}</span>
+                {lang === "en" ? c.en : c.es}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {area === "service" && (
         <div>
@@ -119,7 +153,7 @@ export function FeedbackForm({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {area && (
+      {area && category && (
         <div>
           <textarea
             value={message}
@@ -140,7 +174,7 @@ export function FeedbackForm({ clientId }: { clientId: string }) {
 
       <button
         onClick={submit}
-        disabled={!area || message.trim().length < 3 || isPending}
+        disabled={!area || !category || message.trim().length < 3 || isPending}
         className="w-full h-13 py-4 rounded-2xl bg-brand text-white font-bold text-sm disabled:opacity-40 flex items-center justify-center gap-2"
       >
         {isPending ? (

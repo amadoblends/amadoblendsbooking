@@ -19,6 +19,9 @@ import type { CarouselPost } from "@/components/home/hero-carousel";
  */
 
 const FULL =
+  "id, title, description, image_url, type, button_label, button_href, is_active, is_draft, is_permanent, starts_at, ends_at, focal_x, focal_y, zoom";
+/** Everything but the framing, for a database without migration 33. */
+const WITHOUT_CROP =
   "id, title, description, image_url, type, button_label, button_href, is_active, is_draft, is_permanent, starts_at, ends_at";
 const LEGACY =
   "id, title, description, image_url, type, button_label, button_href, is_active, is_draft, starts_on, ends_on";
@@ -46,6 +49,15 @@ export async function getCarouselPosts(): Promise<CarouselPost[]> {
     .order("sort_order");
 
   if (!error && data) return data as unknown as CarouselPost[];
+
+  // Migration 33 (framing) missing but 23 (window) present: the crop simply
+  // defaults to centred, which is exactly what it did before.
+  const { data: noCrop, error: noCropError } = await supabase
+    .from("carousel_posts")
+    .select(WITHOUT_CROP)
+    .order("sort_order");
+
+  if (!noCropError && noCrop) return noCrop as unknown as CarouselPost[];
 
   const { data: legacy, error: legacyError } = await supabase
     .from("carousel_posts")

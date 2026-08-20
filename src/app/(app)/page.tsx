@@ -15,6 +15,7 @@ import { getCarouselPosts } from "@/lib/data/carousel";
 import { getT } from "@/lib/session";
 import { isBirthdayToday, isInBirthdayWindow } from "@/lib/client-rules";
 import { getBirthdaySettings } from "@/lib/data/birthday";
+import { CompleteBirthDate } from "@/components/profile/complete-birth-date";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -106,6 +107,12 @@ export default async function HomePage() {
           </span>
         </Link>
       )}
+
+      {/*
+        * Registration requires a birth date now; clients who signed up before
+        * it did are asked here rather than being locked out of their own app.
+        */}
+      {!client.birth_date && <CompleteBirthDate clientId={client.id} />}
 
       {/* Promotions, closures and announcements managed from the admin panel */}
       <HeroCarousel posts={carouselPosts} lang={lang} />

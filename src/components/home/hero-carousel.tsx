@@ -7,6 +7,7 @@ import { Scissors } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { visiblePosts, nextTransitionAt } from "@/lib/carousel-status";
 import { translate } from "@/lib/i18n";
+import { cropStyle, normalizeCrop } from "@/lib/carousel-crop";
 
 export interface CarouselPost {
   id: string;
@@ -22,6 +23,10 @@ export interface CarouselPost {
   is_permanent: boolean | null;
   starts_at: string | null;
   ends_at: string | null;
+  /** Which part of the image shows — see lib/carousel-crop. */
+  focal_x?: number | null;
+  focal_y?: number | null;
+  zoom?: number | null;
 }
 
 const TYPE_META: Record<string, { label: string; labelEn: string; emoji: string }> = {
@@ -166,8 +171,11 @@ function Slide({ post, lang }: { post: CarouselPost; lang: "es" | "en" }) {
         post.image_url
           ? {
               backgroundImage: `linear-gradient(100deg, rgba(11,11,13,0.94) 5%, rgba(11,11,13,0.7) 55%, rgba(11,11,13,0.35) 100%), url('${post.image_url}')`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
+              // The framing the barber chose, applied by the same CSS their
+              // preview used — see lib/carousel-crop
+              ...cropStyle(
+                normalizeCrop({ focal_x: post.focal_x, focal_y: post.focal_y, zoom: post.zoom })
+              ),
             }
           : {
               backgroundImage:

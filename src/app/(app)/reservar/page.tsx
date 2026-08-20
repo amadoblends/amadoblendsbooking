@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { BookingWizard, type WizardServiceProduct } from "@/components/booking/booking-wizard";
 import { getBirthdaySettings } from "@/lib/data/birthday";
+import { BookingUnavailable } from "@/components/booking/booking-unavailable";
+import { canBook } from "@/lib/client-status";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 
 export default async function ReservarPage({
@@ -18,13 +20,38 @@ export default async function ReservarPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: client } = await supabase
+  const BASE = "id, full_name, first_name, birth_date";
+  let { data: client } = await supabase
     .from("clients")
-    .select("id, full_name, first_name, birth_date")
+    .select(`${BASE}, status`)
     .eq("user_id", user.id)
     .maybeSingle();
 
+  // `status` arrives with migration 31; without it, nobody is blocked yet
+  if (!client) {
+    ({ data: client } = await supabase
+      .from("clients")
+      .select(BASE)
+      .eq("user_id", user.id)
+      .maybeSingle());
+  }
+
   if (!client) redirect("/configurar-perfil");
+
+  /*
+   * Checked before anything else is loaded. The database refuses the booking
+   * too — see migration 31 — but arriving at a full booking flow only to be
+   * refused at the end would be worse than being told plainly up front.
+   */
+  const status = (client as { status?: string | null }).status;
+  if (!canBook(status as never)) {
+    const { data: shop } = await supabase
+      .from("business_settings")
+      .select("phone")
+      .eq("id", 1)
+      .maybeSingle();
+    return <BookingUnavailable phone={shop?.phone ?? null} />;
+  }
 
   // The shop's today, not the server's — see lib/timezone
   const todayISO = shopToday();

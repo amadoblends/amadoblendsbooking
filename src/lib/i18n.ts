@@ -217,6 +217,7 @@ const dict = {
     es: "Algo que falla o se puede mejorar",
     en: "Something broken or worth improving",
   },
+  "feedback.category": { es: "¿De qué se trata?", en: "What kind?" },
   "feedback.rating": { es: "¿Cómo estuvo?", en: "How was it?" },
   "feedback.placeholderApp": {
     es: "Describe qué pasó o qué te gustaría ver...",
@@ -277,6 +278,15 @@ const dict = {
     es: "La imagen no debe superar 5MB.",
     en: "The image must be under 5MB.",
   },
+  "profile.completeTitle": { es: "Completa tu perfil", en: "Complete your profile" },
+  "profile.completeDob": {
+    es: "Necesitamos tu fecha de nacimiento para completar la información de tu cuenta.",
+    en: "We need your date of birth to complete your account information.",
+  },
+  "profile.dobFailed": {
+    es: "No se pudo guardar. Inténtalo de nuevo.",
+    en: "Couldn't save it. Please try again.",
+  },
   "profile.applyingLanguage": {
     es: "Aplicando idioma / Applying language...",
     en: "Applying language / Aplicando idioma...",
@@ -287,10 +297,19 @@ const dict = {
   "confirm.yes": { es: "Sí, cancelar", en: "Yes, cancel" },
   "confirm.no": { es: "No, mantener", en: "No, keep it" },
 
+  // Blocked account — deliberately neutral; the reason is the barber's alone
+  "blocked.title": { es: "Reservas no disponibles", en: "Booking unavailable" },
+  "blocked.message": {
+    es: "Las reservas en línea no están disponibles para esta cuenta. Comunícate con el negocio para ayudarte.",
+    en: "Online booking is currently unavailable for this account. Please contact the business for assistance.",
+  },
+
   // Common
   "common.back": { es: "Volver", en: "Back" },
   "common.cancel": { es: "Cancelar", en: "Cancel" },
   "common.confirm": { es: "Confirmar", en: "Confirm" },
+  "common.later": { es: "Más tarde", en: "Later" },
+  "common.save": { es: "Guardar", en: "Save" },
   "common.saving": { es: "Guardando...", en: "Saving..." },
   "common.loading": { es: "Cargando...", en: "Loading..." },
   "common.notifications": { es: "Notificaciones", en: "Notifications" },

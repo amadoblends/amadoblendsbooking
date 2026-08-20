@@ -169,6 +169,9 @@ migration_27_product_categories_time.sql
 migration_28_notification_events.sql
 migration_29_clients_birthday_feedback.sql  ← cumpleaños, walk-ins y comentarios
 migration_30_seen_markers.sql               ← el número rojo en Citas
+migration_31_client_status.sql              ← estados y lista negra
+migration_32_feedback_categories.sql        ← categorías de comentarios
+migration_33_carousel_crop.sql              ← encuadre de las imágenes
 ```
 
 Hasta la 23, el aviso de vacaciones terminado seguirá en el carrusel. Hasta la

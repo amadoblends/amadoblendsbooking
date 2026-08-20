@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PasswordFields, passwordsOk } from "@/components/auth/password-fields";
+import { useOtpTimers, formatCountdown } from "@/components/auth/use-otp-timers";
 
 type Mode = "login" | "register";
 type Step = "form" | "otp" | "forgot" | "forgotOtp" | "forgotNew";
@@ -31,6 +32,8 @@ function LoginPageInner() {
 
   const [mode, setMode] = useState<Mode>("login");
   const [step, setStep] = useState<Step>("form");
+  // Resend cooldown and code expiry, shown rather than guessed at
+  const otpTimers = useOtpTimers();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -149,6 +152,7 @@ function LoginPageInner() {
       );
       return false;
     }
+    otpTimers.markSent();
     setNotice(`Te enviamos un código de 6 dígitos a ${target}`);
     return true;
   }
@@ -157,6 +161,11 @@ function LoginPageInner() {
     e.preventDefault();
     if (!passwordsOk(password, confirmPassword)) {
       setError("Revisa la contraseña y su confirmación.");
+      return;
+    }
+    // Checked here too: `required` alone is skipped by a browser autofill
+    if (!dob) {
+      setError("Necesitamos tu fecha de nacimiento.");
       return;
     }
     setLoading(true);
@@ -275,6 +284,22 @@ function LoginPageInner() {
     setError(null);
 
     const supabase = createClient();
+
+    /*
+     * Asked outright, because signInWithOtp deliberately blurs the answer to
+     * avoid revealing which addresses are registered. On a recovery screen
+     * that vagueness is the wrong trade: someone who mistyped their address
+     * would sit waiting for an email that was never going to arrive.
+     */
+    const { data: exists } = await supabase.rpc("email_has_account", {
+      p_email: email.trim(),
+    });
+    if (exists === false) {
+      setError("No encontramos una cuenta con ese correo.");
+      setLoading(false);
+      return;
+    }
+
     // shouldCreateUser:false — recovery must never invent an account
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -290,6 +315,7 @@ function LoginPageInner() {
       setLoading(false);
       return;
     }
+    otpTimers.markSent();
     setNotice(`Te enviamos un código a ${email}`);
     setStep("forgotOtp");
     setLoading(false);
@@ -333,6 +359,13 @@ function LoginPageInner() {
       setLoading(false);
       return;
     }
+    /*
+     * The code is single-use at the server, but the local clocks would keep
+     * counting; clearing them means going back to this screen asks for a
+     * fresh one rather than showing a stale countdown for a spent code.
+     */
+    otpTimers.reset();
+    setOtp("");
     finish();
   }
 
@@ -436,6 +469,7 @@ function LoginPageInner() {
                       setError("No encontramos una cuenta con ese correo.");
                       return false;
                     }
+                    otpTimers.markSent();
                     setNotice(`Te enviamos un código a ${email}`);
                     return true;
                   })()
@@ -443,11 +477,27 @@ function LoginPageInner() {
               if (!ok && !error) setStep(forgot ? "forgot" : "form");
               setLoading(false);
             }}
-            disabled={loading}
-            className="text-xs text-brand font-bold mt-2"
+            disabled={loading || otpTimers.resendIn > 0}
+            className="text-xs text-brand font-bold mt-2 disabled:text-muted"
           >
-            Corregir correo y reenviar
+            {otpTimers.resendIn > 0
+              ? `Reenviar en ${formatCountdown(otpTimers.resendIn)}`
+              : "Corregir correo y reenviar"}
           </button>
+
+          {/*
+            * Saying when the code dies turns "it isn't working" into "ask for
+            * a new one", which is something the person can act on.
+            */}
+          {otpTimers.expired ? (
+            <p className="text-[11px] text-danger mt-2">
+              Ese código expiró. Pide uno nuevo.
+            </p>
+          ) : otpTimers.expiresIn > 0 ? (
+            <p className="text-[11px] text-muted/70 mt-2">
+              El código vence en {formatCountdown(otpTimers.expiresIn)}
+            </p>
+          ) : null}
         </div>
 
         <form onSubmit={forgot ? handleForgotVerify : handleVerify} className="space-y-3">
@@ -629,6 +679,7 @@ function LoginPageInner() {
                 min={DOB_MIN}
                 max={DOB_MAX}
                 onChange={(e) => setDob(e.target.value)}
+                required
                 className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
               />
               {!dob && (
