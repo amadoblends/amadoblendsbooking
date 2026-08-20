@@ -15,6 +15,8 @@
  * value rather than throwing.
  */
 
+import { fromHeader, REPLY_TO } from "./sender";
+
 const API = "https://api.resend.com/emails";
 
 export interface SendResult {
@@ -44,17 +46,24 @@ export interface Mail {
 }
 
 export function emailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+  return Boolean(process.env.RESEND_API_KEY);
 }
 
 export async function sendMail(mail: Mail): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
 
   // Not configured yet is a normal state, not an error worth alarming about
-  if (!key || !from) {
+  if (!key) {
     return { ok: false, skipped: true, error: "email not configured" };
   }
+
+  /*
+   * The shop's identity in one place — see lib/email/sender. It also refuses
+   * to send *as* a gmail.com address, which no provider can sign and which
+   * would land the shop's mail in spam.
+   */
+  const { from, warning } = fromHeader();
+  if (warning) console.warn("[email]", warning);
 
   const recipients = (Array.isArray(mail.to) ? mail.to : [mail.to])
     .map((r) => r.trim())
@@ -77,7 +86,8 @@ export async function sendMail(mail: Mail): Promise<SendResult> {
         subject: mail.subject,
         html: mail.html,
         text: mail.text,
-        reply_to: mail.replyTo,
+        // Answers reach the shop's real inbox even though the From can't be it
+        reply_to: mail.replyTo ?? REPLY_TO,
         attachments: mail.attachments?.map((a) => ({
           filename: a.filename,
           content: a.content,

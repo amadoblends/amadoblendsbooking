@@ -24,6 +24,19 @@ export default function ConfigurarPerfilPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
 
+    /*
+     * A barber landing here would otherwise be handed a client profile and
+     * quietly end up holding both roles. The database refuses the insert too
+     * — see migration 34 — this is so the reason is legible.
+     */
+    const { data: roles } = await supabase.rpc("my_roles");
+    const row = Array.isArray(roles) ? roles[0] : roles;
+    if (row && row.is_barber && !row.is_client) {
+      setError("Esta cuenta es de un barbero. Inicia sesión desde la app del barbero.");
+      setLoading(false);
+      return;
+    }
+
     const [first, ...rest] = name.trim().split(" ");
     const { error: insertError } = await supabase.from("clients").insert({
       full_name: name.trim(),

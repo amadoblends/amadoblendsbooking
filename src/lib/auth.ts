@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
+import { NO_ROLES, type AccountRoles } from "@/lib/account-role";
 
 /**
  * The signed-in user, fetched at most once per request.
@@ -35,3 +36,29 @@ export const getClientRecord = cache(
     return data ?? null;
   }
 );
+
+/**
+ * The roles the signed-in account actually holds.
+ *
+ * Read from the database rather than inferred from having a client profile:
+ * a barber signing in here has no client row, but neither does a brand-new
+ * client who hasn't finished setting up — and those two need opposite
+ * answers.
+ */
+export const getRoles = cache(async (): Promise<AccountRoles> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_roles");
+
+  /*
+   * Before migration 34 there is no my_roles(). Falling back to "everyone is
+   * a client" keeps this app working exactly as it did; the migration is what
+   * actually separates the two.
+   */
+  if (error) return { ...NO_ROLES, isClient: true };
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    isBarber: Boolean(row?.is_barber),
+    isClient: Boolean(row?.is_client),
+  };
+});

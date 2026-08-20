@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "comment": "Sends appointment reminders that have come due. Every five minutes is fine: reminders are due from their send_at onwards, so a tick catches everything since the last one.",
+      "path": "/api/cron/reminders",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

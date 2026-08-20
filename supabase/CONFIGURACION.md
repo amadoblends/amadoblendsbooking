@@ -232,3 +232,73 @@ migration_26_appointment_notifications.sql ← la campanita
 migration_27_product_categories_time.sql   ← categorías + tiempo extra
 migration_28_notification_events.sql       ← un evento, varios canales
 ```
+
+
+---
+
+## 7. El envío de correos
+
+### Por qué el `From` no puede ser amadoblends@gmail.com
+
+Un proveedor transaccional firma el correo con DKIM para un dominio que ha
+verificado que controlas. Nadie puede verificar que controla un buzón de
+gmail.com — ese dominio es de Google. Un `From: …@gmail.com` enviado por
+Resend llega sin alineación de SPF ni DKIM, y Gmail, Outlook y Yahoo lo
+tratan como suplantación: acaba en spam, o directamente rechazado. Además
+enseñaría a los filtros a desconfiar de la dirección que de verdad usas.
+
+La forma correcta, que es la que está puesta:
+
+```
+From:     Amado Blends <citas@tudominio.com>   ← verificado y firmado
+Reply-To: amadoblends@gmail.com                ← donde llegan las respuestas
+```
+
+El cliente ve **Amado Blends** como remitente, y al responder te escribe a tu
+Gmail de siempre. No se pierde nada por no falsificar el `From`.
+
+### Qué configurar
+
+1. En Resend → **Domains**, añade tu dominio y pon los registros DNS que te
+   da (SPF, DKIM y DMARC).
+2. Cuando quede verificado, en Vercel:
+
+```
+EMAIL_FROM        = citas@tudominio.com
+EMAIL_BRAND_NAME  = Amado Blends
+EMAIL_REPLY_TO    = amadoblends@gmail.com
+RESEND_API_KEY    = re_...        (sin NEXT_PUBLIC_, nunca)
+```
+
+Mientras no haya dominio verificado, los correos salen desde el remitente de
+pruebas de Resend, con la marca puesta, y la app lo avisa en los logs en vez
+de fallar en silencio. Si pones un Gmail en `EMAIL_FROM`, **no se usa**: se
+avisa y se envía desde el remitente de pruebas, porque enviarlo así dañaría
+tu reputación de correo.
+
+---
+
+## 8. Los recordatorios automáticos
+
+Necesitan dos variables más:
+
+```
+SUPABASE_SERVICE_ROLE_KEY = ...   (sin NEXT_PUBLIC_, nunca)
+CRON_SECRET               = una cadena larga al azar
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` es la única forma de mandar recordatorios: se
+envían sin que nadie haya iniciado sesión, así que RLS los rechazaría con
+razón. Se usa solo en `lib/supabase/service.ts`, en el servidor.
+
+`vercel.json` ya trae el cron cada cinco minutos. No hace falta precisión: un
+recordatorio está vencido desde su hora en adelante, así que cada pasada
+recoge todo lo vencido desde la anterior. Si una pasada se salta, no se
+pierde nada; si dos se solapan, no se manda nada dos veces —el reclamo es
+atómico.
+
+Para probarlo a mano:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://amadoblendsbooking.vercel.app/api/cron/reminders
+```

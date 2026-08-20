@@ -108,6 +108,24 @@ function LoginPageInner() {
       setLoading(false);
       return;
     }
+
+    /*
+     * A barber's account is turned away here rather than after landing.
+     * The layout refuses it too, and RLS refuses the data underneath — this
+     * is only so the answer arrives at the moment of the attempt, next to
+     * the form they just filled in.
+     */
+    const { data: roles } = await supabase.rpc("my_roles");
+    const row = Array.isArray(roles) ? roles[0] : roles;
+    if (row && row.is_barber && !row.is_client) {
+      await supabase.auth.signOut();
+      setError(
+        "Esta cuenta es de un barbero. Inicia sesión desde la app del barbero."
+      );
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
     router.push("/");
     router.refresh();
