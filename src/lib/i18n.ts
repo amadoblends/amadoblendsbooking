@@ -231,6 +231,15 @@ const dict = {
     es: "Nada en esta categoría por ahora.",
     en: "Nothing in this category yet.",
   },
+  "shop.search": { es: "Buscar productos...", en: "Search products..." },
+  "shop.bestSellers": { es: "Más vendidos", en: "Best Sellers" },
+  "shop.collections": { es: "Colecciones", en: "Featured Collections" },
+  "shop.newArrivals": { es: "Novedades", en: "New Arrivals" },
+  "shop.soldOut": { es: "Agotado por ahora.", en: "Out of stock for now." },
+  "shop.askAtShop": {
+    es: "Pídelo en tu próxima visita",
+    en: "Ask for it at your next visit",
+  },
   "shop.buyOnline": { es: "Comprar online", en: "Buy online" },
 
   // Feedback

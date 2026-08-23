@@ -273,3 +273,26 @@ button {
     transform: translateX(300%);
   }
 }
+
+/*
+ * Bottom sheets rise from the edge they're attached to. Appearing in place
+ * reads as a page swap; sliding up reads as something being pulled over what
+ * you were looking at, which is what it is.
+ */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-in {
+  animation: sheet-in 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-in {
+    animation: none;
+  }
+}

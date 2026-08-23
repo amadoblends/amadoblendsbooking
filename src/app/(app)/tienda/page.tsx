@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BackButton } from "@/components/ui/back-button";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 import { ShopView, type ShopItem } from "@/components/shop/shop-view";
 import { getT } from "@/lib/session";
@@ -24,7 +23,9 @@ export default async function TiendaPage() {
    */
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price, stock, image_url, category")
+    .select(
+      "id, name, price, stock, image_url, category, description, purchase_url, created_at, units_sold"
+    )
     .gt("stock", 0)
     .eq("is_visible_for_sale", true)
     .order("name");
@@ -36,6 +37,10 @@ export default async function TiendaPage() {
     image_url: p.image_url,
     stock: p.stock,
     category: p.category ?? null,
+    description: p.description ?? null,
+    purchase_url: p.purchase_url ?? null,
+    created_at: p.created_at,
+    units_sold: Number(p.units_sold ?? 0),
   }));
 
   // Only categories that actually have something in them
@@ -49,12 +54,11 @@ export default async function TiendaPage() {
     <div className="px-4 pt-[max(12px,var(--safe-top))] pb-4 space-y-5">
       <RealtimeRefresher tables={["products"]} />
 
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground">{t("shop.title")}</h1>
-          <p className="text-[13px] text-muted">{t("shop.subtitle")}</p>
-        </div>
+      {/* The serif name, as on the home screen — this is a top-level tab */}
+      <header className="flex items-center justify-between">
+        <h1 className="font-display text-[26px] text-foreground leading-none">
+          {t("shop.title")}
+        </h1>
       </header>
 
       <ShopView products={items} categories={categories} />

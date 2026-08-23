@@ -1,6 +1,7 @@
+"use client";
+
 import Image from "next/image";
-import Link from "next/link";
-import { Package } from "lucide-react";
+import { Package, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ShopProduct {
@@ -8,98 +9,120 @@ export interface ShopProduct {
   name: string;
   price: number;
   image_url: string | null;
-  /** The line under the name — a short subtitle, not a paragraph. */
-  subtitle?: string | null;
   stock?: number | null;
 }
 
 /**
  * One product in the grid.
  *
- * ── What the reference actually does ─────────────────────────────────────
- * The photo carries the card. It sits on a soft tinted panel — not white,
- * not a border — so a cutout product has something to stand on, and the row
- * reads as a set rather than as separate boxes. Underneath: name, then a
- * quiet subtitle, then the price. Three lines, no more.
+ * ── The shape the design settled on ──────────────────────────────────────
+ * A white card with a border, photograph across the top, then the name and
+ * the price on one line with the action beside it. The image is `cover` and
+ * short — it's a glance, not a product page — and the row of price-and-
+ * button gives every card the same bottom edge, which is what stops a grid
+ * of different-length names from looking ragged.
  *
- * The tall 4:5 crop is the thing that makes a grid look composed rather than
- * stacked; a square grid reads as a spreadsheet of pictures. The image
- * itself is `contain`, not `cover`, because a bottle cropped at the neck is
- * worse than a bottle with air around it.
- *
- * Nothing here is oversized: 13px name, 13px price, and the whitespace does
- * the separating instead of padding.
+ * The whole card opens the product; the round button is the shortcut. Both,
+ * because a 28px circle is a miss waiting to happen on a phone and the card
+ * is the real target.
  */
 export function ProductCard({
   product,
-  href,
+  onQuickAdd,
+  onOpen,
   priority,
+  compact,
 }: {
   product: ShopProduct;
-  href?: string;
+  /** The round button. Omit it and only the card is tappable. */
+  onQuickAdd?: (id: string) => void;
+  onOpen?: (id: string) => void;
   /** Only the first row should preload; the rest arrive as they're scrolled to. */
   priority?: boolean;
+  /** The narrower card used in the horizontal rails. */
+  compact?: boolean;
 }) {
   const soldOut = product.stock !== undefined && product.stock !== null && product.stock <= 0;
 
-  const body = (
-    <>
-      <div
-        className={cn(
-          "relative w-full overflow-hidden rounded-[var(--radius-card)] bg-surface-tint",
-          soldOut && "opacity-55"
-        )}
-        style={{ aspectRatio: "4 / 5" }}
+  return (
+    <div
+      className={cn(
+        "bg-surface rounded-[var(--radius-card)] border border-border overflow-hidden",
+        soldOut && "opacity-60"
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen?.(product.id)}
+        className="block w-full text-left active:opacity-90"
       >
-        {product.image_url ? (
-          <Image
-            src={product.image_url}
-            alt={product.name}
-            fill
-            /*
-             * Two columns on a phone, so each image is about half the
-             * viewport. Telling the browser that is what stops it fetching a
-             * 1600px original to fill a 190px box.
-             */
-            sizes="(max-width: 640px) 50vw, 220px"
-            className="object-contain p-3"
-            priority={priority}
-            loading={priority ? undefined : "lazy"}
-          />
-        ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-muted">
-            <Package size={26} />
-          </span>
-        )}
+        <div
+          className="relative w-full bg-surface-tint"
+          style={{ height: compact ? 80 : 112 }}
+        >
+          {product.image_url ? (
+            <Image
+              src={product.image_url}
+              alt={product.name}
+              fill
+              /*
+               * Two columns on a phone, so each image is about half the
+               * viewport. Saying so is what stops the browser fetching a
+               * 1600px original to fill a 180px box.
+               */
+              sizes={compact ? "112px" : "(max-width: 640px) 50vw, 220px"}
+              className="object-cover"
+              priority={priority}
+              loading={priority ? undefined : "lazy"}
+            />
+          ) : (
+            <span className="absolute inset-0 flex items-center justify-center text-muted">
+              <Package size={compact ? 18 : 24} />
+            </span>
+          )}
 
-        {soldOut && (
-          <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-1 rounded-[var(--radius-pill)] bg-surface text-muted">
-            Agotado
-          </span>
-        )}
-      </div>
+          {soldOut && (
+            <span className="absolute top-2 left-2 text-[9px] font-bold px-2 py-1 rounded-full bg-surface text-muted">
+              Agotado
+            </span>
+          )}
+        </div>
+      </button>
 
-      <div className="pt-2.5">
-        <p className="text-[13px] font-semibold text-foreground leading-snug line-clamp-1">
+      <div className={compact ? "p-2" : "p-3"}>
+        <p
+          className={cn(
+            "font-semibold text-foreground leading-snug line-clamp-1",
+            compact ? "text-[11px]" : "text-[13px]"
+          )}
+        >
           {product.name}
         </p>
-        {product.subtitle && (
-          <p className="text-[11px] text-muted leading-snug line-clamp-1 mt-0.5">
-            {product.subtitle}
-          </p>
-        )}
-        <p className="text-[13px] font-bold text-foreground mt-1 tnum">
-          ${Number(product.price).toFixed(2)}
-        </p>
+        <div className={cn("flex items-center justify-between", compact ? "mt-1" : "mt-1.5")}>
+          <span
+            className={cn(
+              "font-bold text-brand tnum",
+              compact ? "text-[11px]" : "text-[13px]"
+            )}
+          >
+            ${Number(product.price).toFixed(2)}
+          </span>
+          {onQuickAdd && !soldOut && (
+            <button
+              type="button"
+              onClick={() => onQuickAdd(product.id)}
+              aria-label={`Ver ${product.name}`}
+              className={cn(
+                "rounded-full bg-brand text-[var(--color-brand-on)] flex items-center justify-center shrink-0",
+                "active:scale-90 transition-transform",
+                compact ? "w-5 h-5" : "w-7 h-7"
+              )}
+            >
+              <Plus size={compact ? 11 : 15} strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
       </div>
-    </>
-  );
-
-  if (!href) return <div>{body}</div>;
-
-  return (
-    <Link href={href} className="block active:scale-[0.98] transition-transform">
-      {body}
-    </Link>
+    </div>
   );
 }

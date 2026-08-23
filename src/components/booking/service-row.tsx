@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Check, Plus, Scissors } from "lucide-react";
+import { Check, Scissors } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ServiceRowItem {
@@ -49,7 +49,7 @@ export function ServiceRow({
         "w-full flex items-center gap-3 p-3 text-left",
         "bg-surface rounded-[var(--radius-card)] border transition-colors",
         "active:scale-[0.99] duration-100",
-        selected ? "border-brand" : "border-border"
+        selected ? "border-brand bg-brand-light" : "border-border"
       )}
     >
       <div
@@ -83,15 +83,18 @@ export function ServiceRow({
         </p>
       </div>
 
+      {/*
+        * An empty ring that fills when chosen. A "+" would suggest adding
+        * several; only one service is picked here, and the ring says that
+        * without a word.
+        */}
       <span
         className={cn(
-          "w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 transition-colors",
-          selected
-            ? "bg-brand text-[var(--color-brand-on)]"
-            : "bg-brand text-[var(--color-brand-on)]"
+          "w-7 h-7 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors",
+          selected ? "border-brand bg-brand text-[var(--color-brand-on)]" : "border-border"
         )}
       >
-        {selected ? <Check size={16} strokeWidth={3} /> : <Plus size={17} strokeWidth={2.5} />}
+        {selected && <Check size={13} strokeWidth={3} />}
       </span>
     </button>
   );
@@ -124,10 +127,10 @@ export function FilterPills({
             onClick={() => onSelect(o.id)}
             aria-pressed={on}
             className={cn(
-              "shrink-0 h-9 px-4 rounded-[var(--radius-pill)] text-[12px] font-bold transition-colors",
+              "shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors",
               on
                 ? "bg-brand text-[var(--color-brand-on)]"
-                : "bg-surface border border-border text-foreground"
+                : "bg-surface-tint text-[var(--color-foreground-soft)]"
             )}
           >
             {o.label}
