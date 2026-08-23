@@ -1,11 +1,12 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck, Check, Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { OtpPanel } from "@/components/auth/otp-panel";
-import { AvatarUploader } from "@/components/ui/avatar-uploader";
 import { LANGUAGES, type Language } from "@/lib/i18n";
 import { useT } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,8 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
   const [lastName, setLastName] = useState(profile.lastName);
   const [phone, setPhone] = useState(profile.phone);
   const [email, setEmail] = useState(profile.email);
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
+  // Read-only here; the barber owns it (see below)
+  const avatarUrl = profile.avatarUrl;
   const [language, setLanguage] = useState<Language>(profile.language);
 
   const [stage, setStage] = useState<Stage>("edit");
@@ -45,7 +47,7 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
     phone !== profile.phone ||
     email !== profile.email;
 
-  const anyChange = sensitiveChanged || avatarUrl !== profile.avatarUrl || language !== profile.language;
+  const anyChange = sensitiveChanged || language !== profile.language;
 
   // Language is applied app-wide, so switch it right away with a short
   // loading state instead of waiting for the rest of the form to be saved
@@ -70,7 +72,6 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
         full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
         phone: phone.trim(),
         email: email.trim(),
-        avatar_url: avatarUrl,
         language,
       })
       .eq("id", profile.id);
@@ -168,11 +169,27 @@ export function ProfileEditor({ profile }: { profile: ProfileData }) {
   return (
     <form onSubmit={handleSave} className="space-y-4">
       <div className="bg-surface rounded-2xl border border-border p-5 space-y-4">
-        <AvatarUploader
-          value={avatarUrl}
-          fallback={(firstName[0] ?? "?").toUpperCase()}
-          onChange={setAvatarUrl}
-        />
+        {/*
+          * The photo is shown, not edited.
+          *
+          * It's the barber's reference for who is in the chair, so only they
+          * set it — a database trigger reverts any avatar change that doesn't
+          * come from an admin. The uploader used to be here anyway, which was
+          * the worst of both: the client watched it change and the database
+          * quietly put it back.
+          */}
+        <div className="flex items-center gap-3.5">
+          <div className="w-16 h-16 rounded-full bg-surface-tint flex items-center justify-center shrink-0 relative overflow-hidden">
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt="" fill sizes="64px" className="object-cover" />
+            ) : (
+              <span className="text-xl font-bold text-muted">
+                {(firstName[0] ?? "?").toUpperCase()}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-muted leading-relaxed">{t("profile.photoByBarber")}</p>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <LabeledInput label={t("profile.firstName")} value={firstName} onChange={setFirstName} required />

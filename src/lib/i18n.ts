@@ -314,6 +314,10 @@ const dict = {
     es: "Datos guardados, pero el correo de acceso no cambió:",
     en: "Details saved, but your sign-in email didn't change:",
   },
+  "profile.photoByBarber": {
+    es: "Tu barbero se encarga de tu foto. La verás aquí cuando la tome.",
+    en: "Your barber handles your photo. It'll appear here once taken.",
+  },
   "profile.photoType": {
     es: "Solo se permiten imágenes JPG, PNG o WEBP.",
     en: "Only JPG, PNG or WEBP images are allowed.",
