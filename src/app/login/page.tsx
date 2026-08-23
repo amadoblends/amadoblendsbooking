@@ -915,6 +915,11 @@ function Shell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
 
+      {/* The shorter way in, for anyone who'd rather not type a password */}
+      <a href="/entrar" className="mt-5 text-[12px] font-semibold text-brand">
+        Entrar con mi teléfono
+      </a>
+
       <p className="text-xs text-muted mt-6 text-center max-w-xs">
         Al continuar aceptas los términos y condiciones de Amado Blends Barbershop.
       </p>
