@@ -3,10 +3,8 @@ import { Cake, Clock, Scissors } from "lucide-react";
 // Times must read the same here as on the barber's calendar — see lib/timezone
 import { shopTime, shopShortDate } from "@/lib/timezone";
 import Link from "next/link";
-import Image from "next/image";
 import { redirect } from "next/navigation";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { QuickAccessGrid } from "@/components/home/quick-access-grid";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
 import { BusinessHeader } from "@/components/home/business-header";
@@ -17,6 +15,8 @@ import { isBirthdayToday, isInBirthdayWindow } from "@/lib/client-rules";
 import { getBirthdaySettings } from "@/lib/data/birthday";
 import { CompleteBirthDate } from "@/components/profile/complete-birth-date";
 import { RateVisit, type AwaitingVisit } from "@/components/feedback/rate-visit";
+import { HomeView } from "@/components/home/home-view";
+import { shopState, shopStateLabel } from "@/lib/shop-hours";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -34,8 +34,15 @@ export default async function HomePage() {
 
   if (!client) redirect("/configurar-perfil");
 
-  const [business, { data: nextApt }, { data: services }, carouselPosts, birthday] =
-    await Promise.all([
+  const [
+    business,
+    { data: nextApt },
+    { data: services },
+    carouselPosts,
+    birthday,
+    { data: availability },
+    { data: closures },
+  ] = await Promise.all([
       getBusiness(),
     supabase
       .from("appointments")
@@ -56,6 +63,12 @@ export default async function HomePage() {
     // Degrades gracefully when migration 23 has not run — see lib/data/carousel
     getCarouselPosts(),
     getBirthdaySettings(),
+    // Opening hours and holidays, for the "Open · Closes at" line
+    supabase.from("availability").select("*").order("weekday"),
+    supabase
+      .from("closures")
+      .select("starts_on, ends_on, all_day, start_time, end_time")
+      .gte("ends_on", new Date().toISOString().slice(0, 10)),
     ]);
 
   const firstName = client.full_name.split(" ")[0];
@@ -71,6 +84,9 @@ export default async function HomePage() {
   const awaitingVisit = (Array.isArray(awaiting) ? awaiting[0] : awaiting) as
     | AwaitingVisit
     | undefined;
+
+  const state = shopState(availability ?? [], closures ?? []);
+  const stateLabel = shopStateLabel(state, lang);
 
   const isBirthday = isBirthdayToday(client.birth_date);
   // The gift banner runs the whole window; the greeting only on the day
@@ -135,16 +151,16 @@ export default async function HomePage() {
       {nextApt && (
         <Link
           href={`/citas/${nextApt.id}`}
-          className="flex items-center gap-3 bg-surface rounded-2xl border border-border p-4 active:bg-background"
+          className="flex items-center gap-3 bg-surface rounded-[var(--radius-card)] border border-border p-4 active:bg-background"
         >
-          <div className="w-11 h-11 rounded-xl bg-brand-light flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-[var(--radius-control)] bg-brand-light flex items-center justify-center shrink-0">
             <Clock size={19} className="text-brand" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-brand uppercase tracking-wide">
+            <p className="text-[11px] font-bold text-brand uppercase tracking-wide">
               {t("home.nextAppointment")}
             </p>
-            <p className="text-sm font-semibold text-foreground capitalize truncate">
+            <p className="text-[13px] font-semibold text-foreground capitalize truncate mt-0.5">
               {shopShortDate(nextApt.starts_at)} · {shopTime(nextApt.starts_at)} ·{" "}
               {(nextApt.services as unknown as { name: string }).name}
             </p>
@@ -152,58 +168,26 @@ export default async function HomePage() {
         </Link>
       )}
 
-      {/* Quick access — long-press to reorder like iPhone apps */}
-      <QuickAccessGrid />
-
-      {/* Popular services */}
-      {services && services.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-foreground">{t("home.popularServices")}</h2>
-            <Link href="/reservar" className="text-sm text-brand font-semibold">
-              {t("home.seeAll")}
-            </Link>
-          </div>
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
-            {services.map((s) => (
-              <Link
-                key={s.id}
-                href={`/reservar?serviceId=${s.id}`}
-                className="flex items-center gap-3 bg-surface rounded-2xl border border-border p-3 active:bg-background"
-              >
-                {s.image_url ? (
-                  <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
-                    <Image
-                      src={s.image_url}
-                      alt={s.name}
-                      width={56}
-                      height={56}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center"
-                    style={{ background: `${s.color}26` }}
-                  >
-                    <Scissors size={20} style={{ color: s.color }} />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground">{s.name}</p>
-                  <p className="text-xs text-muted">{s.duration_minutes} min</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <p className="text-sm font-bold text-foreground">${s.price}</p>
-                  <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
-                    <span className="text-white font-bold text-base leading-none">+</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      {/*
+        * Location, hero, quick actions, services and offers — see HomeView.
+        * The quick-access grid it replaces was four tiles the client could
+        * reorder; the order is fixed now because the four are the whole app,
+        * and reordering four things is a setting nobody asked for.
+        */}
+      <HomeView
+        businessName={business.name}
+        stateLabel={stateLabel}
+        isOpen={state.open}
+        coverUrl={business.cover_url}
+        services={(services ?? []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          duration_minutes: s.duration_minutes,
+          price: Number(s.price),
+          image_url: s.image_url,
+        }))}
+        offers={[]}
+      />
     </div>
   );
 }

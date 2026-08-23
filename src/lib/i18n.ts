@@ -34,6 +34,14 @@ const dict = {
     es: "Arrastra las tarjetas para ordenarlas",
     en: "Drag the cards to reorder them",
   },
+  "home.heroTitle1": { es: "Tu estilo.", en: "Your style." },
+  "home.heroTitle2": { es: "Tu momento.", en: "Your time." },
+  "home.heroSub": {
+    es: "Reserva tu próxima visita.",
+    en: "Book your next experience.",
+  },
+  "home.bookNow": { es: "Reservar", en: "Book Now" },
+  "home.specialOffers": { es: "Ofertas", en: "Special Offers" },
   "home.done": { es: "Listo", en: "Done" },
 
   // Booking
@@ -155,6 +163,17 @@ const dict = {
   "appointments.history": { es: "Historial", en: "History" },
   "appointments.none": { es: "No tienes citas próximas.", en: "You have no upcoming appointments." },
   "appointments.bookNow": { es: "Reservar ahora", en: "Book now" },
+  "appointments.nextOne": { es: "Tu próxima cita", en: "Upcoming Booking" },
+  "appointments.more": { es: "Después de esa", en: "Next Bookings" },
+  "appointments.noMore": {
+    es: "No tienes más citas por ahora.",
+    en: "Nothing else booked for now.",
+  },
+  "appointments.noHistory": {
+    es: "Todavía no tienes visitas.",
+    en: "No past visits yet.",
+  },
+  "appointments.rescheduleShort": { es: "Reagendar", en: "Reschedule" },
   "appointments.detail": { es: "Detalle de cita", en: "Appointment detail" },
   "appointments.reschedule": { es: "Reagendar cita", en: "Reschedule appointment" },
   "appointments.cancel": { es: "Cancelar cita", en: "Cancel appointment" },
@@ -186,6 +205,14 @@ const dict = {
   "profile.signOut": { es: "Cerrar sesión", en: "Sign out" },
   "profile.appointmentsDone": { es: "Citas realizadas", en: "Appointments" },
   "profile.yourBarber": { es: "Tu barbero", en: "Your barber" },
+  "profile.myAccount": { es: "Mi cuenta", en: "My Account" },
+  "profile.personalInfo": { es: "Información personal", en: "Personal Information" },
+  "profile.preferences": { es: "Preferencias", en: "Preferences" },
+  "profile.support": { es: "Ayuda", en: "Support" },
+  "profile.helpCenter": { es: "Centro de ayuda", en: "Help Center" },
+  "profile.theme": { es: "Tema", en: "Theme" },
+  "profile.themeLight": { es: "Claro", en: "Light" },
+  "profile.themeDark": { es: "Oscuro", en: "Dark" },
   "profile.securityNote": {
     es: "Por seguridad, te enviaremos un código para confirmar los cambios.",
     en: "For your security, we'll send you a code to confirm the changes.",
