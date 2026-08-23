@@ -14,13 +14,15 @@
    * Text is charcoal, not black. Pure black on off-white is harsher than
    * anything printed, and it's what makes dense UI tiring to read.
    */
-  --background: #faf9f6;
+  --background: #f5f1ea;
   --surface: #ffffff;
   /* Behind product and service photography, so cutouts sit on something */
-  --surface-tint: #f2f1ec;
-  --foreground: #191919;
-  --muted: #8a8a90;
-  --border: #e9e7e1;
+  --surface-tint: #efe9df;
+  --foreground: #1a1a1a;
+  --muted: #9a9080;
+  --border: #e8e3da;
+  /* Secondary copy: softer than the body, darker than muted */
+  --foreground-soft: #6b6560;
 
   /*
    * ── The accent ─────────────────────────────────────────────────────────
@@ -32,9 +34,11 @@
    * photography with the accent on the button and the active tab — that
    * restraint is what makes it look considered rather than branded.
    */
-  --color-brand: #ff6a3d;
-  --color-brand-dark: #e0521f;
-  --color-brand-light: #fff1ea;
+  --color-brand: #2d4a2d;
+  --color-brand-dark: #243c24;
+  --color-brand-light: #eaf0ea;
+  /* The warm neutral that sits beside the green — never a fill on its own */
+  --color-accent-warm: #c8b89a;
   /* Text sitting on a brand fill; adjusted per accent for contrast */
   --color-brand-on: #ffffff;
 
@@ -83,10 +87,11 @@
   --surface: #161619;
   --surface-tint: #1e1e22;
   --foreground: #f4f4f5;
+  --foreground-soft: #b8b8bd;
   --muted: #9ca3af;
   --border: #26262b;
 
-  --color-brand-light: #2a170e;
+  --color-brand-light: #162416;
   --color-brand-on: #ffffff;
 
   --color-success: #34d399;
@@ -106,7 +111,9 @@
   --color-surface-tint: var(--surface-tint);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-foreground-soft: var(--foreground-soft);
   --color-border: var(--border);
+  --color-accent-warm: var(--color-accent-warm);
 
   --color-brand: var(--color-brand);
   --color-brand-dark: var(--color-brand-dark);

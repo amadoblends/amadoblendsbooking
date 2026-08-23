@@ -7,7 +7,6 @@ import { redirect } from "next/navigation";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import { RealtimeRefresher } from "@/components/realtime/realtime-refresher";
-import { BusinessHeader } from "@/components/home/business-header";
 import { getBusiness } from "@/lib/data/business";
 import { getCarouselPosts } from "@/lib/data/carousel";
 import { getT } from "@/lib/session";
@@ -98,21 +97,25 @@ export default async function HomePage() {
         tables={["services", "appointments", "carousel_posts", "business_settings"]}
       />
 
-      {/* The shop's own identity leads the screen */}
-      <BusinessHeader business={business}>
+      {/*
+        * The shop's name in the serif, and the bell. Nothing else — the
+        * design opens with the name, and a second heading under it competes
+        * with the hero for the same job.
+        */}
+      <header className="flex items-center justify-between">
+        <h1 className="font-display text-[26px] text-foreground leading-none">
+          {business.name}
+        </h1>
         <NotificationBell clientId={client.id} />
-      </BusinessHeader>
+      </header>
 
-      {/* Greeting */}
-      <div>
-        <h2 className="text-xl font-bold text-foreground">
-          {isBirthday ? t("birthday.happy") : t("home.greeting")}, {firstName}!{" "}
-          {isBirthday ? "🎂" : "👋"}
-        </h2>
-        <p className="text-sm text-muted mt-0.5">
-          {isBirthday ? t("birthday.gift") : t("home.subtitle")}
-        </p>
-      </div>
+      {/*
+        * The greeting rides under the name, small. On a birthday it's the
+        * one day it earns its own line.
+        */}
+      <p className="text-[13px] text-[var(--color-foreground-soft)] -mt-2">
+        {isBirthday ? `${t("birthday.happy")}, ${firstName}! 🎂` : `${t("home.greeting")}, ${firstName}`}
+      </p>
 
       {/* The discount is real, so it says so where they'll book from */}
       {hasGift && (

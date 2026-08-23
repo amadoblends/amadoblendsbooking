@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Playfair_Display, Geist_Mono } from "next/font/google";
+import { DM_Sans, DM_Serif_Display, Geist_Mono } from "next/font/google";
 import { SwRegister } from "@/components/pwa/sw-register";
 import { NativeShell } from "@/components/native-shell";
 import { AppSplash } from "@/components/ui/app-splash";
@@ -7,19 +7,24 @@ import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { AccentProvider, ACCENT_BOOTSTRAP } from "@/components/theme/accent-provider";
 import "./globals.css";
 
-// Same pairing as the barber app so both share one identity
-const sans = Plus_Jakarta_Sans({
+/*
+ * The pairing from the design: DM Sans for everything, DM Serif Display for
+ * the shop's name and the hero. The serif appears twice on a screen at most
+ * — it's the brand's voice, not a heading style, and using it for every
+ * title is what makes an app look like a restaurant menu.
+ */
+const sans = DM_Sans({
   variable: "--font-sans-app",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const display = Playfair_Display({
+const display = DM_Serif_Display({
   variable: "--font-display-app",
   subsets: ["latin"],
   display: "swap",
-  weight: ["500", "600", "700"],
+  weight: ["400"],
 });
 
 const mono = Geist_Mono({
@@ -48,7 +53,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#faf9f6",
+  themeColor: "#f5f1ea",
 };
 
 export default function RootLayout({

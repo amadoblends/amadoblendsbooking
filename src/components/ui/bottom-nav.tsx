@@ -37,7 +37,7 @@ export function BottomNav() {
         "pb-[max(6px,var(--safe-bottom))]"
       )}
     >
-      <ul className="flex items-stretch w-full max-w-[560px] mx-auto px-1 pt-1.5">
+      <ul className="flex items-end w-full max-w-[560px] mx-auto px-2 pt-2">
         {ITEMS.map((item) => {
           const active = item.href === "/" ? path === "/" : path.startsWith(item.href);
           const Icon = item.icon;
@@ -47,28 +47,31 @@ export function BottomNav() {
               <Link
                 href={item.href}
                 aria-label={t(item.key)}
-                className="flex flex-col items-center gap-1 py-1"
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-1",
+                  // Lifted out of the bar, so it reads as the main action
+                  item.primary && "relative -top-3"
+                )}
               >
-                <span
-                  className={cn(
-                    "flex items-center justify-center transition-colors",
-                    item.primary
-                      ? "w-9 h-9 rounded-[var(--radius-control)] bg-brand text-[var(--color-brand-on)]"
-                      : active
-                        ? "text-brand"
-                        : "text-muted"
-                  )}
-                >
-                  <Icon size={item.primary ? 19 : 21} strokeWidth={active ? 2.2 : 1.8} />
-                </span>
-                <span
-                  className={cn(
-                    "text-[10px] font-semibold leading-none",
-                    active ? "text-brand" : "text-muted"
-                  )}
-                >
-                  {t(item.key)}
-                </span>
+                {item.primary ? (
+                  <span className="w-14 h-14 rounded-full bg-brand text-[var(--color-brand-on)] flex items-center justify-center shadow-lg shadow-brand/25 active:scale-95 transition-transform">
+                    <Icon size={25} strokeWidth={2} />
+                  </span>
+                ) : (
+                  <>
+                    <span className={cn(active ? "text-brand" : "text-muted")}>
+                      <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium leading-none",
+                        active ? "text-brand" : "text-muted"
+                      )}
+                    >
+                      {t(item.key)}
+                    </span>
+                  </>
+                )}
               </Link>
             </li>
           );

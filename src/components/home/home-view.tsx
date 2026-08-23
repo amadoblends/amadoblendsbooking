@@ -55,25 +55,24 @@ export function HomeView({
 
   return (
     <div className="space-y-6">
-      {/* Where, and whether it's worth walking over right now */}
-      <div className="flex items-start gap-2">
-        <MapPin size={15} className="text-brand shrink-0 mt-0.5" />
-        <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-foreground leading-tight">
-            {businessName}
-          </p>
-          <p className="text-[12px] leading-tight mt-0.5 flex items-center gap-1.5">
-            <span
-              className={cn(
-                "w-1.5 h-1.5 rounded-full shrink-0",
-                isOpen ? "bg-success" : "bg-muted"
-              )}
-            />
-            <span className={isOpen ? "text-success font-medium" : "text-muted"}>
-              {stateLabel}
-            </span>
-          </p>
-        </div>
+      {/*
+        * One line: where you'd be going, and whether it's worth going now.
+        * The open state sits hard right so it can be read without reading
+        * the name first — it's the part that changes.
+        */}
+      <div className="flex items-center gap-1.5">
+        <MapPin size={15} className="text-brand shrink-0" />
+        <span className="text-[14px] font-medium text-foreground truncate">
+          {businessName}
+        </span>
+        <span
+          className={cn(
+            "ml-auto text-[11px] font-medium shrink-0",
+            isOpen ? "text-brand" : "text-muted"
+          )}
+        >
+          {stateLabel}
+        </span>
       </div>
 
       {/*
@@ -84,7 +83,7 @@ export function HomeView({
       <Link
         href="/reservar"
         className="relative block w-full overflow-hidden rounded-[var(--radius-card)] active:scale-[0.99] transition-transform"
-        style={{ aspectRatio: "16 / 10" }}
+        style={{ height: 180 }}
       >
         {coverUrl ? (
           <Image
@@ -99,33 +98,40 @@ export function HomeView({
           <span className="absolute inset-0 bg-foreground" />
         )}
         {/* Dark from the left so the words stay readable whatever the photo */}
-        <span className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
+        <span className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/20" />
 
-        <span className="absolute inset-0 p-5 flex flex-col justify-center">
-          <span className="font-display text-[26px] leading-[1.1] text-white block">
+        {/* Anchored to the bottom, so the photograph keeps its top half */}
+        <span className="absolute inset-0 p-5 flex flex-col justify-end">
+          <span className="font-display text-[24px] leading-[1.15] text-white block">
             {t("home.heroTitle1")}
             <br />
             {t("home.heroTitle2")}
           </span>
-          <span className="text-[12px] text-white/75 mt-1.5 block max-w-[62%]">
+          <span className="text-[13px] text-white/70 mt-1 mb-4 block">
             {t("home.heroSub")}
           </span>
-          <span className="mt-3.5 inline-flex self-start items-center h-9 px-4 rounded-[var(--radius-control)] bg-brand text-[var(--color-brand-on)] text-xs font-bold">
+          <span className="inline-flex self-start items-center h-10 px-5 rounded-full bg-brand text-[var(--color-brand-on)] text-[13px] font-semibold">
             {t("home.bookNow")}
           </span>
         </span>
       </Link>
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-4 gap-2.5">
+      {/*
+        * Four quick actions. The icon sits in its own white tile with the
+        * label underneath and outside it — the design's shape, and it lets
+        * a two-word label wrap without stretching the tile.
+        */}
+      <div className="grid grid-cols-4 gap-3">
         {QUICK.map((q) => (
           <Link
             key={q.href}
             href={q.href}
-            className="bg-surface rounded-[var(--radius-card)] border border-border py-3 px-1 flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
+            className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
           >
-            <q.icon size={19} className="text-foreground" strokeWidth={1.8} />
-            <span className="text-[10px] font-semibold text-foreground text-center leading-tight line-clamp-2">
+            <span className="w-14 h-14 rounded-[var(--radius-card)] bg-surface border border-border flex items-center justify-center text-brand shadow-sm">
+              <q.icon size={21} strokeWidth={1.8} />
+            </span>
+            <span className="text-[11px] text-center text-[var(--color-foreground-soft)] font-medium leading-tight">
               {t(q.key)}
             </span>
           </Link>

@@ -31,6 +31,16 @@ export interface Accent {
 
 export const ACCENTS: Accent[] = [
   {
+    /* The design's own colour, and the default because of it. */
+    id: "forest",
+    label: "Verde bosque",
+    brand: "#2d4a2d",
+    dark: "#243c24",
+    light: "#eaf0ea",
+    on: "#ffffff",
+    darkModeLight: "#162416",
+  },
+  {
     id: "orange",
     label: "Naranja",
     brand: "#ff6a3d",
