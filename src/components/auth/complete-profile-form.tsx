@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cake, Check, Lock, Mail, Phone, User } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { PasswordFields, passwordsOk } from "@/components/auth/password-fields";
 import { ActionButton } from "@/components/ui/action-button";
+import { completeProfile } from "@/lib/actions/complete-profile";
 import { formatPhone } from "@/lib/otp/phone";
 import type { ProfileField } from "@/lib/profile-state";
 
@@ -72,55 +72,23 @@ export function CompleteProfileForm({
       return;
     }
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
     /*
-     * The email goes onto the auth account as well as the profile. It's what
-     * password recovery uses, and what mints the session on later code
-     * logins — an account with an email in `clients` and none in auth can
-     * do neither.
+     * Saved by a server action, not from here. `auth.updateUser({ email })`
+     * only records a *pending* change and waits for a confirmation link — the
+     * profile would save with no email and the app would ask again on the
+     * next screen. The action sets it outright with the admin key.
      */
-    const { error: authError } = await supabase.auth.updateUser({
-      email: email.trim() || undefined,
+    const result = await completeProfile({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim(),
+      birthDate: dob,
       password,
+      phone: phone ?? "",
     });
 
-    if (authError) {
-      setError(
-        authError.message.toLowerCase().includes("already")
-          ? "Ese correo ya está en uso por otra cuenta."
-          : "No se pudo guardar. Inténtalo de nuevo."
-      );
-      return;
-    }
-
-    const fields = {
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
-      email: email.trim(),
-      birth_date: dob,
-      phone: phone ?? "",
-      user_id: user.id,
-    };
-
-    /*
-     * Upsert on user_id: the row may already exist from a walk-in the barber
-     * linked, and starting a second one would split the history in two.
-     */
-    const { error: saveError } = await supabase
-      .from("clients")
-      .upsert(fields, { onConflict: "user_id" });
-
-    if (saveError) {
-      setError("No se pudo guardar tu perfil. Inténtalo de nuevo.");
+    if (!result.ok) {
+      setError(result.error ?? "No se pudo guardar.");
       return;
     }
 
