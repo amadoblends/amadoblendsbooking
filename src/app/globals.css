@@ -1,32 +1,109 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0b0b0d;
-  --surface: #161619;
-  --foreground: #f4f4f5;
-  --muted: #9ca3af;
-  --border: #26262b;
+  /*
+   * ── The palette ────────────────────────────────────────────────────────
+   * Light is the primary look now. It was dark-only before, which is why
+   * nothing in the app could match a reference built on paper-white.
+   *
+   * The background is warm off-white rather than #fff, and cards ARE white:
+   * that inversion is what gives a card its lift without a heavy shadow. A
+   * pure-white page forces every card to be outlined or shadowed to be seen
+   * at all, which is where "flat and busy" comes from.
+   *
+   * Text is charcoal, not black. Pure black on off-white is harsher than
+   * anything printed, and it's what makes dense UI tiring to read.
+   */
+  --background: #faf9f6;
+  --surface: #ffffff;
+  /* Behind product and service photography, so cutouts sit on something */
+  --surface-tint: #f2f1ec;
+  --foreground: #191919;
+  --muted: #8a8a90;
+  --border: #e9e7e1;
 
+  /*
+   * ── The accent ─────────────────────────────────────────────────────────
+   * One hue, three roles. Everything tintable reads from these, so the
+   * accent can be swapped whole (see the accent preview in the profile)
+   * without touching a single component.
+   *
+   * Deliberately NOT used for large fills. The reference is mostly paper and
+   * photography with the accent on the button and the active tab — that
+   * restraint is what makes it look considered rather than branded.
+   */
   --color-brand: #ff6a3d;
-  --color-brand-dark: #e8551f;
-  --color-brand-light: #2a170e;
+  --color-brand-dark: #e0521f;
+  --color-brand-light: #fff1ea;
+  /* Text sitting on a brand fill; adjusted per accent for contrast */
+  --color-brand-on: #ffffff;
 
-  --color-success: #34d399;
-  --color-success-light: #0e281d;
+  --color-success: #1f9d5b;
+  --color-success-light: #e8f6ee;
 
-  --color-warning: #fbbf24;
-  --color-warning-light: #2b2110;
+  --color-warning: #b7791f;
+  --color-warning-light: #fdf4e3;
 
-  --color-danger: #f87171;
-  --color-danger-light: #2d1514;
+  --color-danger: #d64545;
+  --color-danger-light: #fdeceb;
+
+  /*
+   * ── Rhythm ─────────────────────────────────────────────────────────────
+   * Named so spacing is a decision made once. "Refined density": the
+   * reference is generous around sections and tight inside cards — the two
+   * are not the same measurement, and using one number for both is what
+   * makes an interface feel either cramped or wastefully airy.
+   */
+  --gap-section: 24px;
+  --gap-card: 12px;
+  --pad-screen: 16px;
+
+  /* Radius: cards are soft, controls are softer, pills are round */
+  --radius-card: 20px;
+  --radius-control: 14px;
+  --radius-pill: 999px;
+
+  /*
+   * Shadows are almost invisible on purpose. On an off-white ground a card
+   * only needs a hint of lift; anything more reads as a 2014 material app.
+   */
+  --shadow-card: 0 1px 2px rgba(25, 25, 25, 0.04), 0 8px 24px rgba(25, 25, 25, 0.04);
+  --shadow-raised: 0 2px 6px rgba(25, 25, 25, 0.06), 0 16px 40px rgba(25, 25, 25, 0.08);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/*
+ * Dark stays supported and complete — it was the only theme until now, and
+ * dropping it would break every client who has been using the app at night.
+ */
+:root[data-theme="dark"] {
+  --background: #0b0b0d;
+  --surface: #161619;
+  --surface-tint: #1e1e22;
+  --foreground: #f4f4f5;
+  --muted: #9ca3af;
+  --border: #26262b;
+
+  --color-brand-light: #2a170e;
+  --color-brand-on: #ffffff;
+
+  --color-success: #34d399;
+  --color-success-light: #0e281d;
+  --color-warning: #fbbf24;
+  --color-warning-light: #2b2110;
+  --color-danger: #f87171;
+  --color-danger-light: #2d1514;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-tint: var(--surface-tint);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
@@ -34,19 +111,27 @@
   --color-brand: var(--color-brand);
   --color-brand-dark: var(--color-brand-dark);
   --color-brand-light: var(--color-brand-light);
+  --color-brand-on: var(--color-brand-on);
 
   --color-success: var(--color-success);
   --color-success-light: var(--color-success-light);
-
   --color-warning: var(--color-warning);
   --color-warning-light: var(--color-warning-light);
-
   --color-danger: var(--color-danger);
   --color-danger-light: var(--color-danger-light);
+
+  --color-violet: #7c5cff;
+  --color-violet-light: #efeaff;
 
   --font-sans: var(--font-sans-app);
   --font-display: var(--font-display-app);
   --font-mono: var(--font-mono-app);
+
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
 }
 
 /*
@@ -99,6 +184,10 @@ a {
 }
 
 html {
+  /* Follows the token set above; dark is opt-in via data-theme */
+  color-scheme: light;
+}
+html[data-theme="dark"] {
   color-scheme: dark;
 }
 

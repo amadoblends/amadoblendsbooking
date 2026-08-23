@@ -4,6 +4,7 @@ import { SwRegister } from "@/components/pwa/sw-register";
 import { NativeShell } from "@/components/native-shell";
 import { AppSplash } from "@/components/ui/app-splash";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
+import { AccentProvider, ACCENT_BOOTSTRAP } from "@/components/theme/accent-provider";
 import "./globals.css";
 
 // Same pairing as the barber app so both share one identity
@@ -47,7 +48,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0b0b0d",
+  themeColor: "#faf9f6",
 };
 
 export default function RootLayout({
@@ -60,13 +61,23 @@ export default function RootLayout({
       lang="es"
       className={`${sans.variable} ${display.variable} ${mono.variable} h-full`}
     >
+      <head>
+        {/*
+          * Applies the stored accent before React runs. Without it, every load
+          * paints the default for a frame and then flips — which reads as a
+          * bug rather than a preference.
+          */}
+        <script dangerouslySetInnerHTML={{ __html: ACCENT_BOOTSTRAP }} />
+      </head>
       <body className="h-full bg-background text-foreground">
         <SwRegister />
         <NativeShell />
-        {/* Covers the black gap before the first paint */}
+        {/* Covers the blank gap before the first paint */}
         <AppSplash />
-        {/* Every destructive action asks through our own dialog, not the browser's */}
-        <ConfirmProvider>{children}</ConfirmProvider>
+        <AccentProvider>
+          {/* Every destructive action asks through our own dialog, not the browser's */}
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </AccentProvider>
       </body>
     </html>
   );

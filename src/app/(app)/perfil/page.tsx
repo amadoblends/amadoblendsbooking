@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { SignOutButton } from "@/components/profile/sign-out-button";
+import { AccentPicker } from "@/components/theme/accent-picker";
 import { LANGUAGES } from "@/lib/i18n";
 import { getT } from "@/lib/session";
 
@@ -137,6 +138,9 @@ export default async function PerfilPage() {
           label={t("feedback.title")}
         />
       </div>
+
+      {/* Temporary while the accent is being decided — see lib/accents */}
+      <AccentPicker />
 
       <SignOutButton />
     </div>
