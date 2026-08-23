@@ -3,13 +3,14 @@
 import { Suspense, useState } from "react";
 import {
   Scissors, Loader2, Mail, User, Phone, ShieldCheck, ArrowLeft, Cake,
-  KeyRound, Lock, Eye, EyeOff, Check,
+  KeyRound, Lock, Eye, EyeOff, Check, AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PasswordFields, passwordsOk } from "@/components/auth/password-fields";
 import { useOtpTimers, formatCountdown } from "@/components/auth/use-otp-timers";
+import { SKIP_OTP, SKIP_OTP_NOTICE } from "@/lib/auth-config";
 
 type Mode = "login" | "register";
 type Step = "form" | "otp" | "forgot" | "forgotOtp" | "forgotNew";
@@ -204,6 +205,65 @@ function LoginPageInner() {
     }
     setLoading(true);
     setError(null);
+
+    /*
+     * Test mode: create the account and sign in, with no code in between.
+     *
+     * signUp returns a session immediately only when "Confirm email" is off
+     * in Supabase — with it on, it sends a confirmation mail and hands back
+     * no session, which is the very wait this is meant to skip. If that
+     * happens, say so rather than appearing to hang.
+     */
+    if (SKIP_OTP) {
+      const supabase = createClient();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: `${firstName} ${lastName}`.trim(),
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+          },
+        },
+      });
+
+      if (signUpError) {
+        setError(
+          signUpError.message.toLowerCase().includes("already")
+            ? "Ese correo ya tiene una cuenta. Inicia sesión."
+            : signUpError.message
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (!data.session) {
+        setError(
+          "Falta apagar «Confirm email» en Supabase → Authentication → Providers → Email."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Same walk-in adoption the verified path does — see handleVerify
+      const { data: match } = await supabase
+        .rpc("find_unclaimed_client", { p_email: email, p_phone: phone })
+        .maybeSingle();
+
+      if (match && (match as { id: string }).id) {
+        setClaimable(match as { id: string; full_name: string; visit_count: number });
+        setLoading(false);
+        return;
+      }
+
+      await createProfile(data.user!.id);
+      finish();
+      setLoading(false);
+      return;
+    }
+
     if (await sendCode()) setStep("otp");
     setLoading(false);
   }
@@ -838,6 +898,18 @@ function Shell({ children }: { children: React.ReactNode }) {
         <h1 className="text-2xl font-bold text-foreground">Amado Blends</h1>
         <p className="text-sm text-muted mt-1">Barbershop · Reserva tu cita</p>
       </div>
+
+      {/*
+        * Not dismissible on purpose. A test mode that hides itself is a test
+        * mode that ships — this is the one thing that must be impossible to
+        * miss while the flag is on.
+        */}
+      {SKIP_OTP && (
+        <div className="w-full max-w-sm mb-3 flex items-center gap-2 rounded-[var(--radius-control)] border border-warning/30 bg-warning-light px-3.5 py-2.5">
+          <AlertTriangle size={14} className="text-warning shrink-0" />
+          <p className="text-[11px] font-semibold text-foreground">{SKIP_OTP_NOTICE.es}</p>
+        </div>
+      )}
 
       <div className="w-full max-w-sm bg-surface rounded-3xl border border-border p-6 shadow-sm">
         {children}
