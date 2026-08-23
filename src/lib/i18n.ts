@@ -198,6 +198,12 @@ const dict = {
     en: "Professional products for your best look",
   },
   "shop.empty": { es: "Pronto tendremos productos disponibles.", en: "Products coming soon." },
+  "shop.all": { es: "Todos", en: "All" },
+  "shop.allProducts": { es: "Todos los productos", en: "All products" },
+  "shop.emptyCategory": {
+    es: "Nada en esta categoría por ahora.",
+    en: "Nothing in this category yet.",
+  },
   "shop.buyOnline": { es: "Comprar online", en: "Buy online" },
 
   // Feedback
